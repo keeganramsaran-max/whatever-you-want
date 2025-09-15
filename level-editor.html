@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Dash - Level Editor</title>
+    <link rel="stylesheet" href="editor-styles.css">
+</head>
+<body>
+    <div class="editor-container">
+        <div class="editor-header">
+            <h1>Level Editor</h1>
+            <div class="editor-controls">
+                <button id="playTestBtn">Play Test</button>
+                <button id="saveBtn">Save Level</button>
+                <button id="loadBtn">Load Level</button>
+                <button id="clearBtn">Clear All</button>
+                <button id="backToGameBtn">Back to Game</button>
+            </div>
+        </div>
+
+        <div class="editor-main">
+            <div class="toolbar">
+                <div class="tool-section">
+                    <h3>Tools</h3>
+                    <button class="tool-btn active" data-tool="select">Select</button>
+                    <button class="tool-btn" data-tool="place">Place</button>
+                    <button class="tool-btn" data-tool="delete">Delete</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Obstacles</h3>
+                    <button class="obstacle-btn" data-type="spike">Spike</button>
+                    <button class="obstacle-btn" data-type="platform">Platform</button>
+                    <button class="obstacle-btn" data-type="wall-top">Wall Top</button>
+                    <button class="obstacle-btn" data-type="wall-bottom">Wall Bottom</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Game Mode Portals</h3>
+                    <button class="portal-btn" data-mode="cube">Cube Portal</button>
+                    <button class="portal-btn" data-mode="wave">Wave Portal</button>
+                    <button class="portal-btn" data-mode="ship">Ship Portal</button>
+                    <button class="portal-btn" data-mode="ball">Ball Portal</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Speed Portals</h3>
+                    <button class="speed-btn" data-speed="0.5">0.5x Speed</button>
+                    <button class="speed-btn" data-speed="0.75">0.75x Speed</button>
+                    <button class="speed-btn" data-speed="1.0">1x Speed</button>
+                    <button class="speed-btn" data-speed="1.5">1.5x Speed</button>
+                    <button class="speed-btn" data-speed="2.0">2x Speed</button>
+                    <button class="speed-btn" data-speed="3.0">3x Speed</button>
+                    <button class="speed-btn" data-speed="4.0">4x Speed</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Properties</h3>
+                    <label for="gridSnap">Grid Snap:</label>
+                    <input type="checkbox" id="gridSnap" checked>
+
+                    <label for="gridSize">Grid Size:</label>
+                    <input type="range" id="gridSize" min="10" max="50" value="20">
+
+                    <label for="objectWidth">Width:</label>
+                    <input type="number" id="objectWidth" value="40" min="10" max="200">
+
+                    <label for="objectHeight">Height:</label>
+                    <input type="number" id="objectHeight" value="40" min="10" max="200">
+                </div>
+            </div>
+
+            <div class="editor-viewport">
+                <div class="viewport-controls">
+                    <button id="zoomIn">Zoom In</button>
+                    <button id="zoomOut">Zoom Out</button>
+                    <button id="resetView">Reset View</button>
+                    <span id="zoomLevel">100%</span>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="editorCanvas" width="1200" height="400"></canvas>
+                </div>
+
+                <div class="timeline">
+                    <div class="timeline-track"></div>
+                    <div class="timeline-cursor"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="editor-footer">
+            <div class="level-info">
+                <input type="text" id="levelName" placeholder="Level Name" value="Custom Level">
+                <select id="levelDifficulty">
+                    <option value="1">Easy</option>
+                    <option value="2">Medium</option>
+                    <option value="3">Hard</option>
+                    <option value="4">Expert</option>
+                    <option value="5">Insane</option>
+                </select>
+            </div>
+
+            <div class="editor-stats">
+                <span>Objects: <span id="objectCount">0</span></span>
+                <span>Length: <span id="levelLength">0</span>px</span>
+                <span>Mouse: <span id="mousePos">0, 0</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load/Save Modal -->
+    <div id="levelModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Save Level</h2>
+            <div id="modalBody">
+                <textarea id="levelData" placeholder="Level data will appear here..."></textarea>
+                <div class="modal-buttons">
+                    <button id="modalConfirm">Save</button>
+                    <button id="modalCancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="level-editor.js"></script>
+</body>
+</html>

@@ -58,6 +58,7 @@ class GeometryDash {
         this.mousePressed = false;
 
         this.setupEventListeners();
+        this.checkForCustomLevel();
         this.generateLevel();
         this.gameLoop();
     }
@@ -173,6 +174,10 @@ class GeometryDash {
             this.togglePause();
         });
 
+        document.getElementById('editorBtn').addEventListener('click', () => {
+            window.location.href = 'level-editor.html';
+        });
+
         document.getElementById('restartBtn').addEventListener('click', () => {
             this.restartGame();
         });
@@ -245,7 +250,7 @@ class GeometryDash {
         }
 
         if (this.player.onGround || this.player.y >= this.canvas.height - this.player.height - 50) {
-            this.player.velocity = -this.player.jumpPower;
+            this.player.velocity = -this.player.jumpPower * this.speedMultiplier;
             this.player.onGround = false;
             this.playSound('jump');
 
@@ -269,9 +274,9 @@ class GeometryDash {
         const isPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
 
         if (isPressed) {
-            this.player.waveVelocity = -this.player.waveSpeed;
+            this.player.waveVelocity = -this.player.waveSpeed * this.speedMultiplier;
         } else {
-            this.player.waveVelocity = this.player.waveSpeed;
+            this.player.waveVelocity = this.player.waveSpeed * this.speedMultiplier;
         }
 
         this.player.y += this.player.waveVelocity;
@@ -300,11 +305,14 @@ class GeometryDash {
         if (mode !== 'ship') return;
 
         const isPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
+        const acceleration = 0.8 * this.speedMultiplier;
+        const deceleration = 0.6 * this.speedMultiplier;
+        const maxSpeed = this.player.shipSpeed * this.speedMultiplier;
 
         if (isPressed) {
-            this.player.shipVelocity = Math.max(this.player.shipVelocity - 0.8, -this.player.shipSpeed);
+            this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration, -maxSpeed);
         } else {
-            this.player.shipVelocity = Math.min(this.player.shipVelocity + 0.6, this.player.shipSpeed);
+            this.player.shipVelocity = Math.min(this.player.shipVelocity + deceleration, maxSpeed);
         }
 
         this.player.y += this.player.shipVelocity;
@@ -334,7 +342,8 @@ class GeometryDash {
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
         if (mode !== 'ball') return;
 
-        this.player.velocity += this.player.gravity * this.player.gravityDirection;
+        const adjustedGravity = this.player.gravity * this.speedMultiplier;
+        this.player.velocity += adjustedGravity * this.player.gravityDirection;
         this.player.y += this.player.velocity;
 
         this.player.rotation += this.player.velocity * 0.1;
@@ -383,6 +392,22 @@ class GeometryDash {
         }
     }
 
+    checkForCustomLevel() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('custom') === 'true') {
+            const customLevel = localStorage.getItem('customLevel');
+            if (customLevel) {
+                try {
+                    this.customLevelData = JSON.parse(customLevel);
+                    this.isCustomLevel = true;
+                } catch (e) {
+                    console.error('Invalid custom level data');
+                    this.isCustomLevel = false;
+                }
+            }
+        }
+    }
+
     generateLevel() {
         this.obstacles = [];
         this.portals = [];
@@ -390,13 +415,61 @@ class GeometryDash {
         this.speed = this.baseSpeed;
         this.speedMultiplier = 1;
 
-        if (this.gameMode === 'mixed') {
+        if (this.isCustomLevel && this.customLevelData) {
+            this.loadCustomLevel();
+        } else if (this.gameMode === 'mixed') {
             this.generateMixedLevel();
         } else {
             this.generateLevelByDifficulty();
         }
 
-        this.generateSpeedPortals();
+        if (!this.isCustomLevel) {
+            this.generateSpeedPortals();
+        }
+    }
+
+    loadCustomLevel() {
+        // Load obstacles
+        this.obstacles = this.customLevelData.objects.map(obj => ({
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            type: obj.type
+        }));
+
+        // Load portals
+        this.portals = this.customLevelData.portals.map(portal => ({
+            x: portal.x,
+            y: portal.y,
+            width: portal.width,
+            height: portal.height,
+            fromMode: 'cube',
+            toMode: portal.mode
+        }));
+
+        // Load speed portals
+        this.speedPortals = this.customLevelData.speedPortals.map(portal => ({
+            x: portal.x,
+            y: portal.y,
+            width: portal.width,
+            height: portal.height,
+            speed: portal.speed,
+            color: this.getSpeedPortalColor(portal.speed)
+        }));
+    }
+
+    getSpeedPortalColor(speed) {
+        const colors = {
+            0.5: '#4CAF50',
+            0.75: '#8BC34A',
+            1.0: '#00ff88',
+            1.5: '#FFC107',
+            2.0: '#FF9800',
+            3.0: '#F44336',
+            4.0: '#9C27B0'
+        };
+        return colors[speed] || '#00ff88';
     }
 
     generateLevelByDifficulty() {
@@ -985,7 +1058,8 @@ class GeometryDash {
                 this.handleBallMovement();
                 break;
             default:
-                this.player.velocity += this.player.gravity;
+                const adjustedGravity = this.player.gravity * this.speedMultiplier;
+                this.player.velocity += adjustedGravity;
                 this.player.y += this.player.velocity;
                 break;
         }

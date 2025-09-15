@@ -1,0 +1,600 @@
+class LevelEditor {
+    constructor() {
+        this.canvas = document.getElementById('editorCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        // Editor state
+        this.currentTool = 'select';
+        this.selectedObject = null;
+        this.objects = [];
+        this.portals = [];
+        this.speedPortals = [];
+
+        // View state
+        this.camera = { x: 0, y: 0 };
+        this.zoom = 1;
+        this.gridSize = 20;
+        this.gridSnap = true;
+
+        // Mouse state
+        this.mouse = { x: 0, y: 0, down: false };
+        this.isDragging = false;
+
+        // Current object properties
+        this.currentObjectType = 'spike';
+        this.currentGameMode = 'cube';
+        this.currentSpeed = 1.0;
+        this.objectWidth = 40;
+        this.objectHeight = 40;
+
+        this.setupEventListeners();
+        this.render();
+    }
+
+    setupEventListeners() {
+        // Tool selection
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelector('.tool-btn.active').classList.remove('active');
+                e.target.classList.add('active');
+                this.currentTool = e.target.dataset.tool;
+                this.selectedObject = null;
+            });
+        });
+
+        // Obstacle selection
+        document.querySelectorAll('.obstacle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.currentObjectType = e.target.dataset.type;
+                this.currentTool = 'place';
+                document.querySelector('.tool-btn.active').classList.remove('active');
+                document.querySelector('[data-tool="place"]').classList.add('active');
+            });
+        });
+
+        // Portal selection
+        document.querySelectorAll('.portal-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.currentGameMode = e.target.dataset.mode;
+                this.currentTool = 'place';
+                this.currentObjectType = 'portal';
+                document.querySelector('.tool-btn.active').classList.remove('active');
+                document.querySelector('[data-tool="place"]').classList.add('active');
+            });
+        });
+
+        // Speed portal selection
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.currentSpeed = parseFloat(e.target.dataset.speed);
+                this.currentTool = 'place';
+                this.currentObjectType = 'speed-portal';
+                document.querySelector('.tool-btn.active').classList.remove('active');
+                document.querySelector('[data-tool="place"]').classList.add('active');
+            });
+        });
+
+        // Canvas events
+        this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+        this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
+
+        // Property controls
+        document.getElementById('gridSnap').addEventListener('change', (e) => {
+            this.gridSnap = e.target.checked;
+        });
+
+        document.getElementById('gridSize').addEventListener('input', (e) => {
+            this.gridSize = parseInt(e.target.value);
+        });
+
+        document.getElementById('objectWidth').addEventListener('input', (e) => {
+            this.objectWidth = parseInt(e.target.value);
+        });
+
+        document.getElementById('objectHeight').addEventListener('input', (e) => {
+            this.objectHeight = parseInt(e.target.value);
+        });
+
+        // Viewport controls
+        document.getElementById('zoomIn').addEventListener('click', () => this.zoomIn());
+        document.getElementById('zoomOut').addEventListener('click', () => this.zoomOut());
+        document.getElementById('resetView').addEventListener('click', () => this.resetView());
+
+        // Header controls
+        document.getElementById('playTestBtn').addEventListener('click', () => this.playTest());
+        document.getElementById('saveBtn').addEventListener('click', () => this.saveLevel());
+        document.getElementById('loadBtn').addEventListener('click', () => this.loadLevel());
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearLevel());
+        document.getElementById('backToGameBtn').addEventListener('click', () => this.backToGame());
+
+        // Modal events
+        document.querySelector('.close').addEventListener('click', () => this.closeModal());
+        document.getElementById('modalCancel').addEventListener('click', () => this.closeModal());
+        document.getElementById('modalConfirm').addEventListener('click', () => this.confirmModal());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this.onKeyDown(e));
+    }
+
+    onMouseDown(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mouse.x = (e.clientX - rect.left) / this.zoom + this.camera.x;
+        this.mouse.y = (e.clientY - rect.top) / this.zoom + this.camera.y;
+        this.mouse.down = true;
+
+        if (this.gridSnap) {
+            this.mouse.x = Math.round(this.mouse.x / this.gridSize) * this.gridSize;
+            this.mouse.y = Math.round(this.mouse.y / this.gridSize) * this.gridSize;
+        }
+
+        switch (this.currentTool) {
+            case 'place':
+                this.placeObject();
+                break;
+            case 'select':
+                this.selectObject();
+                break;
+            case 'delete':
+                this.deleteObject();
+                break;
+        }
+    }
+
+    onMouseMove(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mouse.x = (e.clientX - rect.left) / this.zoom + this.camera.x;
+        this.mouse.y = (e.clientY - rect.top) / this.zoom + this.camera.y;
+
+        if (this.gridSnap) {
+            this.mouse.x = Math.round(this.mouse.x / this.gridSize) * this.gridSize;
+            this.mouse.y = Math.round(this.mouse.y / this.gridSize) * this.gridSize;
+        }
+
+        // Update mouse position display
+        document.getElementById('mousePos').textContent = `${Math.round(this.mouse.x)}, ${Math.round(this.mouse.y)}`;
+
+        if (this.mouse.down && this.selectedObject && this.currentTool === 'select') {
+            this.selectedObject.x = this.mouse.x;
+            this.selectedObject.y = this.mouse.y;
+            this.isDragging = true;
+        }
+
+        this.render();
+    }
+
+    onMouseUp(e) {
+        this.mouse.down = false;
+        this.isDragging = false;
+    }
+
+    onWheel(e) {
+        e.preventDefault();
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        this.zoom = Math.max(0.1, Math.min(3, this.zoom * zoomFactor));
+        document.getElementById('zoomLevel').textContent = `${Math.round(this.zoom * 100)}%`;
+        this.render();
+    }
+
+    onKeyDown(e) {
+        switch (e.key) {
+            case 'Delete':
+                if (this.selectedObject) {
+                    this.deleteSelectedObject();
+                }
+                break;
+            case 'Escape':
+                this.selectedObject = null;
+                break;
+            case 'c':
+                if (e.ctrlKey && this.selectedObject) {
+                    this.copyObject();
+                }
+                break;
+        }
+    }
+
+    placeObject() {
+        const newObject = {
+            x: this.mouse.x,
+            y: this.mouse.y,
+            width: this.objectWidth,
+            height: this.objectHeight,
+            type: this.currentObjectType
+        };
+
+        if (this.currentObjectType === 'portal') {
+            newObject.mode = this.currentGameMode;
+            this.portals.push(newObject);
+        } else if (this.currentObjectType === 'speed-portal') {
+            newObject.speed = this.currentSpeed;
+            this.speedPortals.push(newObject);
+        } else {
+            this.objects.push(newObject);
+        }
+
+        this.updateStats();
+    }
+
+    selectObject() {
+        this.selectedObject = null;
+
+        // Check objects
+        for (let obj of [...this.objects, ...this.portals, ...this.speedPortals]) {
+            if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
+                this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
+                this.selectedObject = obj;
+                break;
+            }
+        }
+    }
+
+    deleteObject() {
+        // Check objects
+        for (let i = this.objects.length - 1; i >= 0; i--) {
+            const obj = this.objects[i];
+            if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
+                this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
+                this.objects.splice(i, 1);
+                this.updateStats();
+                return;
+            }
+        }
+
+        // Check portals
+        for (let i = this.portals.length - 1; i >= 0; i--) {
+            const obj = this.portals[i];
+            if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
+                this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
+                this.portals.splice(i, 1);
+                this.updateStats();
+                return;
+            }
+        }
+
+        // Check speed portals
+        for (let i = this.speedPortals.length - 1; i >= 0; i--) {
+            const obj = this.speedPortals[i];
+            if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
+                this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
+                this.speedPortals.splice(i, 1);
+                this.updateStats();
+                return;
+            }
+        }
+    }
+
+    deleteSelectedObject() {
+        if (!this.selectedObject) return;
+
+        // Remove from appropriate array
+        let index = this.objects.indexOf(this.selectedObject);
+        if (index !== -1) {
+            this.objects.splice(index, 1);
+        } else {
+            index = this.portals.indexOf(this.selectedObject);
+            if (index !== -1) {
+                this.portals.splice(index, 1);
+            } else {
+                index = this.speedPortals.indexOf(this.selectedObject);
+                if (index !== -1) {
+                    this.speedPortals.splice(index, 1);
+                }
+            }
+        }
+
+        this.selectedObject = null;
+        this.updateStats();
+    }
+
+    zoomIn() {
+        this.zoom = Math.min(3, this.zoom * 1.2);
+        document.getElementById('zoomLevel').textContent = `${Math.round(this.zoom * 100)}%`;
+        this.render();
+    }
+
+    zoomOut() {
+        this.zoom = Math.max(0.1, this.zoom * 0.8);
+        document.getElementById('zoomLevel').textContent = `${Math.round(this.zoom * 100)}%`;
+        this.render();
+    }
+
+    resetView() {
+        this.zoom = 1;
+        this.camera.x = 0;
+        this.camera.y = 0;
+        document.getElementById('zoomLevel').textContent = '100%';
+        this.render();
+    }
+
+    updateStats() {
+        const totalObjects = this.objects.length + this.portals.length + this.speedPortals.length;
+        document.getElementById('objectCount').textContent = totalObjects;
+
+        let maxX = 0;
+        [...this.objects, ...this.portals, ...this.speedPortals].forEach(obj => {
+            maxX = Math.max(maxX, obj.x + obj.width);
+        });
+        document.getElementById('levelLength').textContent = maxX;
+    }
+
+    render() {
+        this.ctx.save();
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Apply camera and zoom
+        this.ctx.scale(this.zoom, this.zoom);
+        this.ctx.translate(-this.camera.x, -this.camera.y);
+
+        // Draw grid
+        if (this.gridSnap) {
+            this.drawGrid();
+        }
+
+        // Draw ground (aligned to grid)
+        const groundY = this.canvas.height / this.zoom - 50 + this.camera.y;
+        const alignedGroundY = this.gridSnap ? Math.round(groundY / this.gridSize) * this.gridSize : groundY;
+
+        this.ctx.fillStyle = '#333';
+        this.ctx.fillRect(0, alignedGroundY,
+                         this.canvas.width / this.zoom + this.camera.x, 50);
+
+        // Draw objects
+        this.drawObjects();
+        this.drawPortals();
+        this.drawSpeedPortals();
+
+        // Draw preview object
+        if (this.currentTool === 'place') {
+            this.drawPreview();
+        }
+
+        // Draw selection
+        if (this.selectedObject) {
+            this.drawSelection();
+        }
+
+        this.ctx.restore();
+    }
+
+    drawGrid() {
+        this.ctx.strokeStyle = 'rgba(0, 255, 136, 0.2)';
+        this.ctx.lineWidth = 1;
+
+        // Calculate ground position for proper alignment
+        const groundY = this.canvas.height / this.zoom - 50 + this.camera.y;
+        const baselineY = Math.floor(groundY / this.gridSize) * this.gridSize;
+
+        const startX = Math.floor(this.camera.x / this.gridSize) * this.gridSize;
+        const endX = this.camera.x + this.canvas.width / this.zoom;
+        const startY = Math.floor(this.camera.y / this.gridSize) * this.gridSize;
+        const endY = this.camera.y + this.canvas.height / this.zoom;
+
+        // Draw vertical grid lines
+        for (let x = startX; x <= endX; x += this.gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, this.camera.y);
+            this.ctx.lineTo(x, endY);
+            this.ctx.stroke();
+        }
+
+        // Draw horizontal grid lines aligned to ground
+        for (let y = baselineY; y >= startY; y -= this.gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.camera.x, y);
+            this.ctx.lineTo(endX, y);
+            this.ctx.stroke();
+        }
+
+        for (let y = baselineY + this.gridSize; y <= endY; y += this.gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.camera.x, y);
+            this.ctx.lineTo(endX, y);
+            this.ctx.stroke();
+        }
+    }
+
+    drawObjects() {
+        this.objects.forEach(obj => {
+            this.ctx.fillStyle = this.getObjectColor(obj.type);
+            this.ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+
+            if (obj.type === 'platform') {
+                this.ctx.strokeStyle = '#4CAF50';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+            }
+        });
+    }
+
+    drawPortals() {
+        this.portals.forEach(portal => {
+            this.ctx.fillStyle = this.getPortalColor(portal.mode);
+            this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
+
+            // Draw portal icon
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = '12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(portal.mode.toUpperCase(),
+                            portal.x + portal.width/2,
+                            portal.y + portal.height/2 + 4);
+        });
+    }
+
+    drawSpeedPortals() {
+        this.speedPortals.forEach(portal => {
+            this.ctx.fillStyle = this.getSpeedColor(portal.speed);
+            this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
+
+            // Draw speed text
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = '10px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`${portal.speed}x`,
+                            portal.x + portal.width/2,
+                            portal.y + portal.height/2 + 3);
+        });
+    }
+
+    drawPreview() {
+        this.ctx.globalAlpha = 0.5;
+
+        if (this.currentObjectType === 'portal') {
+            this.ctx.fillStyle = this.getPortalColor(this.currentGameMode);
+        } else if (this.currentObjectType === 'speed-portal') {
+            this.ctx.fillStyle = this.getSpeedColor(this.currentSpeed);
+        } else {
+            this.ctx.fillStyle = this.getObjectColor(this.currentObjectType);
+        }
+
+        this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+        this.ctx.globalAlpha = 1;
+    }
+
+    drawSelection() {
+        this.ctx.strokeStyle = '#00ff88';
+        this.ctx.lineWidth = 3;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeRect(this.selectedObject.x - 2, this.selectedObject.y - 2,
+                          this.selectedObject.width + 4, this.selectedObject.height + 4);
+        this.ctx.setLineDash([]);
+    }
+
+    getObjectColor(type) {
+        const colors = {
+            'spike': '#ff4444',
+            'platform': '#4CAF50',
+            'wall-top': '#ff9800',
+            'wall-bottom': '#ff9800'
+        };
+        return colors[type] || '#ffffff';
+    }
+
+    getPortalColor(mode) {
+        const colors = {
+            'cube': '#00ff88',
+            'wave': '#2196F3',
+            'ship': '#FF9800',
+            'ball': '#9C27B0'
+        };
+        return colors[mode] || '#ffffff';
+    }
+
+    getSpeedColor(speed) {
+        const colors = {
+            0.5: '#4CAF50',
+            0.75: '#8BC34A',
+            1.0: '#00ff88',
+            1.5: '#FFC107',
+            2.0: '#FF9800',
+            3.0: '#F44336',
+            4.0: '#9C27B0'
+        };
+        return colors[speed] || '#ffffff';
+    }
+
+    playTest() {
+        // Save current level to localStorage for testing
+        const levelData = this.exportLevel();
+        localStorage.setItem('customLevel', levelData);
+
+        // Open game in new tab/window with custom level
+        window.open('geometry-dash.html?custom=true', '_blank');
+    }
+
+    saveLevel() {
+        const levelData = this.exportLevel();
+        document.getElementById('levelData').value = levelData;
+        document.getElementById('modalTitle').textContent = 'Save Level';
+        document.getElementById('levelModal').style.display = 'block';
+    }
+
+    loadLevel() {
+        document.getElementById('levelData').value = '';
+        document.getElementById('modalTitle').textContent = 'Load Level';
+        document.getElementById('levelModal').style.display = 'block';
+    }
+
+    clearLevel() {
+        if (confirm('Are you sure you want to clear all objects?')) {
+            this.objects = [];
+            this.portals = [];
+            this.speedPortals = [];
+            this.selectedObject = null;
+            this.updateStats();
+            this.render();
+        }
+    }
+
+    backToGame() {
+        window.location.href = 'geometry-dash.html';
+    }
+
+    closeModal() {
+        document.getElementById('levelModal').style.display = 'none';
+    }
+
+    confirmModal() {
+        const title = document.getElementById('modalTitle').textContent;
+        const data = document.getElementById('levelData').value;
+
+        if (title === 'Save Level') {
+            // Copy to clipboard or download
+            navigator.clipboard.writeText(data).then(() => {
+                alert('Level data copied to clipboard!');
+            }).catch(() => {
+                // Fallback: create download
+                const blob = new Blob([data], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${document.getElementById('levelName').value}.gd`;
+                a.click();
+            });
+        } else if (title === 'Load Level') {
+            try {
+                this.importLevel(data);
+                alert('Level loaded successfully!');
+            } catch (e) {
+                alert('Invalid level data!');
+            }
+        }
+
+        this.closeModal();
+    }
+
+    exportLevel() {
+        const levelData = {
+            name: document.getElementById('levelName').value,
+            difficulty: parseInt(document.getElementById('levelDifficulty').value),
+            objects: this.objects,
+            portals: this.portals,
+            speedPortals: this.speedPortals,
+            created: new Date().toISOString()
+        };
+
+        return JSON.stringify(levelData, null, 2);
+    }
+
+    importLevel(data) {
+        const levelData = JSON.parse(data);
+
+        this.objects = levelData.objects || [];
+        this.portals = levelData.portals || [];
+        this.speedPortals = levelData.speedPortals || [];
+
+        document.getElementById('levelName').value = levelData.name || 'Custom Level';
+        document.getElementById('levelDifficulty').value = levelData.difficulty || 1;
+
+        this.selectedObject = null;
+        this.updateStats();
+        this.render();
+    }
+}
+
+// Initialize the editor when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new LevelEditor();
+});
