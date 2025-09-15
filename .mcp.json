@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ctedp6": {
+      "type": "http",
+      "url": "https://devmcp.ct839.com/mcp"
+    }
+  }
+}

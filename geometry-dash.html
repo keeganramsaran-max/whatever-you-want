@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Dash</title>
+    <link rel="stylesheet" href="game-styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>Geometry Dash</h1>
+            <div class="game-stats">
+                <span class="level">Level: <span id="currentLevel">1</span></span>
+                <span class="score">Score: <span id="score">0</span></span>
+                <span class="attempts">Attempts: <span id="attempts">1</span></span>
+            </div>
+        </div>
+
+        <div class="game-area" id="gameArea">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div class="game-ui">
+                <div class="instructions" id="instructions">
+                    <p id="instructionText">Press SPACE/UP ARROW or click to jump!</p>
+                    <p>Avoid the obstacles!</p>
+                </div>
+                <div class="game-over" id="gameOver" style="display: none;">
+                    <h2>Game Over!</h2>
+                    <p>Final Score: <span id="finalScore">0</span></p>
+                    <button id="restartBtn">Play Again</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-controls">
+            <div class="level-selector">
+                <label for="levelSelect">Level:</label>
+                <select id="levelSelect">
+                    <option value="1">Level 1 - Easy</option>
+                    <option value="2">Level 2 - Medium</option>
+                    <option value="3">Level 3 - Hard</option>
+                    <option value="4">Level 4 - Expert</option>
+                    <option value="5">Level 5 - Insane</option>
+                </select>
+            </div>
+            <div class="game-mode-selector">
+                <label for="gameMode">Game Mode:</label>
+                <select id="gameMode">
+                    <option value="mixed">Mixed Level</option>
+                    <option value="cube">Cube Mode</option>
+                    <option value="wave">Wave Mode</option>
+                    <option value="ship">Ship Mode</option>
+                    <option value="ball">Ball Mode</option>
+                </select>
+            </div>
+            <button id="startBtn">Start Game</button>
+            <button id="pauseBtn" disabled>Pause</button>
+            <div class="volume-control">
+                <label for="volume">Volume:</label>
+                <input type="range" id="volume" min="0" max="100" value="50">
+            </div>
+        </div>
+    </div>
+
+    <script src="geometry-dash.js"></script>
+</body>
+</html>
