@@ -1549,13 +1549,14 @@ class GeometryDash {
         `;
         gameOverDiv.style.display = 'block';
 
-        document.getElementById('nextLevelBtn').addEventListener('click', () => {
+        // Use onclick to avoid duplicate listeners
+        document.getElementById('nextLevelBtn').onclick = () => {
             this.nextLevel();
-        });
+        };
 
-        document.getElementById('restartLevelBtn').addEventListener('click', () => {
+        document.getElementById('restartLevelBtn').onclick = () => {
             this.restartGame();
-        });
+        };
     }
 
     nextLevel() {
@@ -1563,8 +1564,7 @@ class GeometryDash {
             this.currentLevel++;
             document.getElementById('levelSelect').value = this.currentLevel;
             document.getElementById('currentLevel').textContent = this.currentLevel;
-            this.attempts = 1;
-            document.getElementById('attempts').textContent = this.attempts;
+            this.attempts = 0; // Reset to 0 because restartGame() will increment to 1
             this.restartGame();
         } else {
             this.showGameComplete();
@@ -1660,18 +1660,7 @@ class GeometryDash {
         this.attempts++;
         document.getElementById('attempts').textContent = this.attempts;
 
-        this.player.x = 100;
-        this.player.y = this.gameMode === 'wave' ? (this.canvas.height - 50) / 2 - this.player.height / 2 : 300;
-        this.player.velocity = 0;
-        this.player.onGround = false;
-        this.player.trail = [];
-        this.player.waveVelocity = 0;
-        this.player.gravityDirection = 1;
-
-        if (this.gameMode === 'mixed') {
-            this.currentGameMode = 'cube';
-        }
-
+        this.resetPlayerPosition();
         this.speed = this.baseSpeed;
         this.speedMultiplier = 1;
         this.camera.x = 0;
@@ -1682,6 +1671,8 @@ class GeometryDash {
 
         this.gameState = 'playing';
         document.getElementById('gameOver').style.display = 'none';
+        document.getElementById('instructions').style.display = 'none';
+        document.getElementById('startBtn').disabled = true;
         document.getElementById('pauseBtn').disabled = false;
         document.getElementById('pauseBtn').textContent = 'Pause';
     }
