@@ -44,6 +44,12 @@ class GeometryDash {
             gravityDirection: 1
         };
 
+        // Hitbox offsets for more forgiving collision
+        this.hitboxOffset = {
+            player: 4,     // Player hitbox is 4px smaller on each side
+            obstacle: 3    // Obstacle hitboxes are 3px smaller on each side
+        };
+
         this.obstacles = [];
         this.particles = [];
         this.portals = [];
@@ -908,6 +914,44 @@ class GeometryDash {
         }
     }
 
+    getPlayerHitbox() {
+        const offset = this.hitboxOffset.player;
+        return {
+            x: this.player.x + offset,
+            y: this.player.y + offset,
+            width: this.player.width - (offset * 2),
+            height: this.player.height - (offset * 2)
+        };
+    }
+
+    getObstacleHitbox(obstacle) {
+        // Platforms should have full hitbox for landing, but smaller for deadly collision
+        if (obstacle.type === 'platform') {
+            return {
+                x: obstacle.x,
+                y: obstacle.y,
+                width: obstacle.width,
+                height: obstacle.height
+            };
+        }
+
+        // Deadly obstacles have smaller hitboxes
+        const offset = this.hitboxOffset.obstacle;
+        return {
+            x: obstacle.x + offset,
+            y: obstacle.y + offset,
+            width: obstacle.width - (offset * 2),
+            height: obstacle.height - (offset * 2)
+        };
+    }
+
+    checkHitboxCollision(hitbox1, hitbox2) {
+        return hitbox1.x < hitbox2.x + hitbox2.width &&
+               hitbox1.x + hitbox1.width > hitbox2.x &&
+               hitbox1.y < hitbox2.y + hitbox2.height &&
+               hitbox1.y + hitbox1.height > hitbox2.y;
+    }
+
     checkCollisions() {
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
 
@@ -936,13 +980,16 @@ class GeometryDash {
 
         this.player.onGround = this.player.y + this.player.height >= ground;
 
-        for (let obstacle of this.obstacles) {
-            if (this.player.x < obstacle.x + obstacle.width &&
-                this.player.x + this.player.width > obstacle.x &&
-                this.player.y < obstacle.y + obstacle.height &&
-                this.player.y + this.player.height > obstacle.y) {
+        const playerHitbox = this.getPlayerHitbox();
 
-                if (obstacle.type === 'platform') {
+        for (let obstacle of this.obstacles) {
+            if (obstacle.type === 'platform') {
+                // Use full collision for platform landing detection
+                if (this.player.x < obstacle.x + obstacle.width &&
+                    this.player.x + this.player.width > obstacle.x &&
+                    this.player.y < obstacle.y + obstacle.height &&
+                    this.player.y + this.player.height > obstacle.y) {
+
                     const playerBottom = this.player.y + this.player.height;
                     const playerPrevBottom = playerBottom - this.player.velocity;
                     const platformTop = obstacle.y;
@@ -959,23 +1006,27 @@ class GeometryDash {
                         continue;
                     }
                 }
-
-                this.gameOver();
-                return;
+            } else {
+                // Use smaller hitbox for deadly obstacles
+                const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                    this.gameOver();
+                    return;
+                }
             }
         }
     }
 
     checkBallCollisions() {
-        for (let obstacle of this.obstacles) {
-            if (this.player.x < obstacle.x + obstacle.width &&
-                this.player.x + this.player.width > obstacle.x &&
-                this.player.y < obstacle.y + obstacle.height &&
-                this.player.y + this.player.height > obstacle.y) {
+        const playerHitbox = this.getPlayerHitbox();
 
-                if (obstacle.type === 'platform') {
-                    const playerCenterY = this.player.y + this.player.height / 2;
-                    const platformCenterY = obstacle.y + obstacle.height / 2;
+        for (let obstacle of this.obstacles) {
+            if (obstacle.type === 'platform') {
+                // Use full collision for platform bouncing
+                if (this.player.x < obstacle.x + obstacle.width &&
+                    this.player.x + this.player.width > obstacle.x &&
+                    this.player.y < obstacle.y + obstacle.height &&
+                    this.player.y + this.player.height > obstacle.y) {
 
                     if (this.player.gravityDirection > 0) {
                         const playerBottom = this.player.y + this.player.height;
@@ -1009,9 +1060,13 @@ class GeometryDash {
                         }
                     }
                 }
-
-                this.gameOver();
-                return;
+            } else {
+                // Use smaller hitbox for deadly obstacles
+                const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                    this.gameOver();
+                    return;
+                }
             }
         }
     }
@@ -1032,12 +1087,11 @@ class GeometryDash {
             }
         }
 
-        for (let obstacle of this.obstacles) {
-            if (this.player.x < obstacle.x + obstacle.width &&
-                this.player.x + this.player.width > obstacle.x &&
-                this.player.y < obstacle.y + obstacle.height &&
-                this.player.y + this.player.height > obstacle.y) {
+        const playerHitbox = this.getPlayerHitbox();
 
+        for (let obstacle of this.obstacles) {
+            const obstacleHitbox = this.getObstacleHitbox(obstacle);
+            if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
                 this.gameOver();
                 return;
             }
@@ -1274,13 +1328,20 @@ class GeometryDash {
     checkPortalCollisions() {
         if (this.gameMode !== 'mixed') return;
 
+        const playerHitbox = this.getPlayerHitbox();
+
         for (let portal of this.portals) {
             if (portal.used) continue;
 
-            if (this.player.x < portal.x + portal.width &&
-                this.player.x + this.player.width > portal.x &&
-                this.player.y < portal.y + portal.height &&
-                this.player.y + this.player.height > portal.y) {
+            // Use slightly larger hitbox for portals for easier activation
+            const portalHitbox = {
+                x: portal.x - 2,
+                y: portal.y - 2,
+                width: portal.width + 4,
+                height: portal.height + 4
+            };
+
+            if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
 
                 this.currentGameMode = portal.toMode;
                 this.updateInstructions();
@@ -1398,14 +1459,20 @@ class GeometryDash {
     }
 
     checkSpeedPortalCollisions() {
+        const playerHitbox = this.getPlayerHitbox();
+
         for (let portal of this.speedPortals) {
             if (portal.used) continue;
 
-            if (this.player.x < portal.x + portal.width &&
-                this.player.x + this.player.width > portal.x &&
-                this.player.y < portal.y + portal.height &&
-                this.player.y + this.player.height > portal.y) {
+            // Use slightly larger hitbox for speed portals for easier activation
+            const portalHitbox = {
+                x: portal.x - 2,
+                y: portal.y - 2,
+                width: portal.width + 4,
+                height: portal.height + 4
+            };
 
+            if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
                 this.speedMultiplier = portal.speedMultiplier;
                 this.speed = this.baseSpeed * this.speedMultiplier;
 
