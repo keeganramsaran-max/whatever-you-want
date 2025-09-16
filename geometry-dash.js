@@ -41,7 +41,8 @@ class GeometryDash {
             ballVelocity: 0,
             ballSpeed: 6,
             rotation: 0,
-            gravityDirection: 1
+            gravityDirection: 1,
+            canChangeGravity: true
         };
 
         // Hitbox offsets for more forgiving collision
@@ -237,6 +238,7 @@ class GeometryDash {
         this.player.ballVelocity = 0;
         this.player.rotation = 0;
         this.player.gravityDirection = 1;
+        this.player.canChangeGravity = true;
         this.player.onGround = false;
         this.player.trail = [];
         this.camera.x = 0;
@@ -250,8 +252,11 @@ class GeometryDash {
         }
 
         if (mode === 'ball') {
-            this.player.gravityDirection *= -1;
-            this.playSound('jump');
+            if (this.player.canChangeGravity) {
+                this.player.gravityDirection *= -1;
+                this.player.canChangeGravity = false;
+                this.playSound('jump');
+            }
             return;
         }
 
@@ -360,8 +365,9 @@ class GeometryDash {
         if (this.player.gravityDirection > 0) {
             if (this.player.y + this.player.height >= ground) {
                 this.player.y = ground - this.player.height;
-                this.player.velocity = -Math.abs(this.player.velocity) * 0.7;
+                this.player.velocity = 0;
                 this.player.onGround = true;
+                this.player.canChangeGravity = true;
 
                 for (let i = 0; i < 3; i++) {
                     this.particles.push({
@@ -379,8 +385,9 @@ class GeometryDash {
         } else {
             if (this.player.y <= ceiling) {
                 this.player.y = ceiling;
-                this.player.velocity = Math.abs(this.player.velocity) * 0.7;
+                this.player.velocity = 0;
                 this.player.onGround = true;
+                this.player.canChangeGravity = true;
 
                 for (let i = 0; i < 3; i++) {
                     this.particles.push({
@@ -1660,6 +1667,11 @@ class GeometryDash {
         this.attempts++;
         document.getElementById('attempts').textContent = this.attempts;
 
+        // Reset game mode to starting mode for mixed levels
+        if (this.gameMode === 'mixed') {
+            this.currentGameMode = 'cube';
+        }
+
         this.resetPlayerPosition();
         this.speed = this.baseSpeed;
         this.speedMultiplier = 1;
@@ -1668,6 +1680,7 @@ class GeometryDash {
         this.particles = [];
 
         this.generateLevel();
+        this.updateInstructions(); // Update instructions to match reset game mode
 
         this.gameState = 'playing';
         document.getElementById('gameOver').style.display = 'none';
