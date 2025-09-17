@@ -34,6 +34,7 @@ class GeometryDash {
             onGround: false,
             color: '#00ff88',
             trail: [],
+            persistentWaveTrail: [],
             waveVelocity: 0,
             waveSpeed: 3,
             shipVelocity: 0,
@@ -241,6 +242,7 @@ class GeometryDash {
         this.player.canChangeGravity = true;
         this.player.onGround = false;
         this.player.trail = [];
+        this.player.persistentWaveTrail = [];
         this.camera.x = 0;
     }
 
@@ -1138,6 +1140,15 @@ class GeometryDash {
         this.player.trail.forEach((point, index) => {
             point.alpha = index / this.player.trail.length;
         });
+
+        // Add to persistent wave trail when in wave mode
+        const currentMode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+        if (currentMode === 'wave') {
+            this.player.persistentWaveTrail.push({
+                x: this.player.x + this.player.width / 2,
+                y: this.player.y + this.player.height / 2
+            });
+        }
     }
 
     updateCamera() {
@@ -1184,12 +1195,35 @@ class GeometryDash {
         this.ctx.save();
         this.ctx.translate(-this.camera.x, 0);
 
+        const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+
+        // Draw persistent wave trail
+        if (this.player.persistentWaveTrail.length > 1) {
+            this.ctx.strokeStyle = 'rgba(144, 238, 144, 0.8)';
+            this.ctx.lineWidth = 8;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.beginPath();
+
+            for (let i = 0; i < this.player.persistentWaveTrail.length; i++) {
+                const point = this.player.persistentWaveTrail[i];
+                if (i === 0) {
+                    this.ctx.moveTo(point.x, point.y);
+                } else {
+                    this.ctx.lineTo(point.x, point.y);
+                }
+            }
+            this.ctx.stroke();
+        }
+
         this.player.trail.forEach(point => {
-            this.ctx.fillStyle = `rgba(0, 255, 136, ${point.alpha * 0.3})`;
+            if (mode === 'wave') {
+                this.ctx.fillStyle = `rgba(144, 238, 144, ${point.alpha * 0.4})`;
+            } else {
+                this.ctx.fillStyle = `rgba(0, 255, 136, ${point.alpha * 0.3})`;
+            }
             this.ctx.fillRect(point.x, point.y, this.player.width, this.player.height);
         });
-
-        const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
         this.ctx.fillStyle = this.player.color;
 
         const centerX = this.player.x + this.player.width / 2;
@@ -1349,6 +1383,10 @@ class GeometryDash {
             };
 
             if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
+                // Clear persistent wave trail when switching away from wave mode
+                if (this.currentGameMode === 'wave' && portal.toMode !== 'wave') {
+                    this.player.persistentWaveTrail = [];
+                }
 
                 this.currentGameMode = portal.toMode;
                 this.updateInstructions();
@@ -1646,8 +1684,22 @@ class GeometryDash {
 
     gameOver() {
         this.gameState = 'gameOver';
-        document.getElementById('gameOver').style.display = 'block';
-        document.getElementById('finalScore').textContent = this.score;
+
+        // Set game over content for death
+        const gameOverDiv = document.getElementById('gameOver');
+        gameOverDiv.innerHTML = `
+            <h2>Game Over</h2>
+            <p>Level ${this.currentLevel} - Score: <span id="finalScore">${this.score}</span></p>
+            <p>Attempts: ${this.attempts}</p>
+            <button id="restartBtn">Restart</button>
+        `;
+        gameOverDiv.style.display = 'block';
+
+        // Re-attach restart event listener
+        document.getElementById('restartBtn').onclick = () => {
+            this.restartGame();
+        };
+
         document.getElementById('pauseBtn').disabled = true;
         this.playSound('death');
 

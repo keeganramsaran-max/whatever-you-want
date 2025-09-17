@@ -19,6 +19,9 @@ class LevelEditor {
         // Mouse state
         this.mouse = { x: 0, y: 0, down: false };
         this.isDragging = false;
+        this.isPanning = false;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
 
         // Current object properties
         this.currentObjectType = 'spike';
@@ -39,38 +42,65 @@ class LevelEditor {
                 e.target.classList.add('active');
                 this.currentTool = e.target.dataset.tool;
                 this.selectedObject = null;
+
+                // Clear other button states when switching tools
+                document.querySelectorAll('.portal-btn, .speed-btn, .obstacle-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
         // Obstacle selection
         document.querySelectorAll('.obstacle-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                // Remove active state from all obstacle buttons
+                document.querySelectorAll('.obstacle-btn').forEach(b => b.classList.remove('active'));
+                // Add active state to clicked button
+                e.target.classList.add('active');
+
                 this.currentObjectType = e.target.dataset.type;
                 this.currentTool = 'place';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
+
+                // Clear other button states
+                document.querySelectorAll('.portal-btn, .speed-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
         // Portal selection
         document.querySelectorAll('.portal-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                // Remove active state from all portal buttons
+                document.querySelectorAll('.portal-btn').forEach(b => b.classList.remove('active'));
+                // Add active state to clicked button
+                e.target.classList.add('active');
+
                 this.currentGameMode = e.target.dataset.mode;
                 this.currentTool = 'place';
                 this.currentObjectType = 'portal';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
+
+                // Clear other button states
+                document.querySelectorAll('.obstacle-btn, .speed-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
         // Speed portal selection
         document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                // Remove active state from all speed buttons
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                // Add active state to clicked button
+                e.target.classList.add('active');
+
                 this.currentSpeed = parseFloat(e.target.dataset.speed);
                 this.currentTool = 'place';
                 this.currentObjectType = 'speed-portal';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
+
+                // Clear other button states
+                document.querySelectorAll('.obstacle-btn, .portal-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
@@ -79,6 +109,7 @@ class LevelEditor {
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
         // Property controls
         document.getElementById('gridSnap').addEventListener('change', (e) => {
@@ -124,6 +155,15 @@ class LevelEditor {
         this.mouse.y = (e.clientY - rect.top) / this.zoom + this.camera.y;
         this.mouse.down = true;
 
+        // Middle mouse button or right mouse button for panning
+        if (e.button === 1 || e.button === 2) {
+            this.isPanning = true;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
+
         if (this.gridSnap) {
             this.mouse.x = Math.round(this.mouse.x / this.gridSize) * this.gridSize;
             this.mouse.y = Math.round(this.mouse.y / this.gridSize) * this.gridSize;
@@ -143,6 +183,24 @@ class LevelEditor {
     }
 
     onMouseMove(e) {
+        // Handle panning
+        if (this.isPanning) {
+            const deltaX = e.clientX - this.lastPanX;
+            const deltaY = e.clientY - this.lastPanY;
+
+            this.camera.x -= deltaX / this.zoom;
+            this.camera.y -= deltaY / this.zoom;
+
+            // Prevent scrolling too far left
+            this.camera.x = Math.max(0, this.camera.x);
+
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+
+            this.render();
+            return;
+        }
+
         const rect = this.canvas.getBoundingClientRect();
         this.mouse.x = (e.clientX - rect.left) / this.zoom + this.camera.x;
         this.mouse.y = (e.clientY - rect.top) / this.zoom + this.camera.y;
@@ -167,13 +225,29 @@ class LevelEditor {
     onMouseUp(e) {
         this.mouse.down = false;
         this.isDragging = false;
+
+        if (this.isPanning) {
+            this.isPanning = false;
+            this.canvas.style.cursor = 'default';
+        }
     }
 
     onWheel(e) {
         e.preventDefault();
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        this.zoom = Math.max(0.1, Math.min(3, this.zoom * zoomFactor));
-        document.getElementById('zoomLevel').textContent = `${Math.round(this.zoom * 100)}%`;
+
+        if (e.ctrlKey) {
+            // Zoom with Ctrl + wheel
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            this.zoom = Math.max(0.1, Math.min(3, this.zoom * zoomFactor));
+            document.getElementById('zoomLevel').textContent = `${Math.round(this.zoom * 100)}%`;
+        } else {
+            // Horizontal scroll without Ctrl
+            const scrollAmount = e.deltaY * 2;
+            this.camera.x += scrollAmount;
+            // Prevent scrolling too far left
+            this.camera.x = Math.max(0, this.camera.x);
+        }
+
         this.render();
     }
 
@@ -191,6 +265,22 @@ class LevelEditor {
                 if (e.ctrlKey && this.selectedObject) {
                     this.copyObject();
                 }
+                break;
+            case 'ArrowLeft':
+                this.camera.x = Math.max(0, this.camera.x - 50);
+                this.render();
+                break;
+            case 'ArrowRight':
+                this.camera.x += 50;
+                this.render();
+                break;
+            case 'ArrowUp':
+                this.camera.y = Math.max(-200, this.camera.y - 50);
+                this.render();
+                break;
+            case 'ArrowDown':
+                this.camera.y = Math.min(200, this.camera.y + 50);
+                this.render();
                 break;
         }
     }
