@@ -57,8 +57,8 @@ class GeometryDash {
         this.portals = [];
         this.speedPortals = [];
         this.camera = { x: 0 };
-        this.baseSpeed = 2.5;
-        this.speed = 2.5;
+        this.baseSpeed = 3.75;
+        this.speed = 3.75;
         this.speedMultiplier = 1;
         this.lastObstacle = 0;
 
