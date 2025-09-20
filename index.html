@@ -3,79 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Website</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Game Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .game-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: rgba(255,255,255,0.15);
+        }
+
+        .game-card h2 {
+            margin-top: 0;
+            color: #fff;
+        }
+
+        .game-card p {
+            margin: 15px 0;
+            opacity: 0.9;
+        }
+
+        .play-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .play-btn:hover {
+            background: #ff5252;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <nav>
-            <div class="logo">
-                <h1>My Website</h1>
-            </div>
-            <ul class="nav-links">
-                <li><a href="#home">Home</a></li>
-                <li><a href="#about">About</a></li>
-                <li><a href="#services">Services</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
+    <div class="container">
+        <h1>🎮 Game Hub</h1>
+        <p>Choose your adventure!</p>
 
-    <main>
-        <section id="home" class="hero">
-            <div class="hero-content">
-                <h2>Welcome to My Website</h2>
-                <p>This is a modern, responsive website built with HTML, CSS, and JavaScript.</p>
-                <button class="cta-button">Get Started</button>
+        <div class="game-grid">
+            <div class="game-card">
+                <h2>🔷 Geometry Dash</h2>
+                <p>Jump and fly your way through danger in this rhythm-based action platformer!</p>
+                <a href="geometry-dash.html" class="play-btn">Play Game</a>
             </div>
-        </section>
 
-        <section id="about" class="about">
-            <div class="container">
-                <h2>About Us</h2>
-                <p>We create amazing web experiences that help businesses grow and connect with their customers.</p>
+            <div class="game-card">
+                <h2>🛠️ Level Editor</h2>
+                <p>Create your own custom levels and share them with friends!</p>
+                <a href="level-editor.html" class="play-btn">Open Editor</a>
             </div>
-        </section>
-
-        <section id="services" class="services">
-            <div class="container">
-                <h2>Our Services</h2>
-                <div class="service-grid">
-                    <div class="service-card">
-                        <h3>Web Design</h3>
-                        <p>Beautiful, modern designs that capture your brand's essence.</p>
-                    </div>
-                    <div class="service-card">
-                        <h3>Development</h3>
-                        <p>Fast, responsive websites built with the latest technologies.</p>
-                    </div>
-                    <div class="service-card">
-                        <h3>SEO</h3>
-                        <p>Optimize your site to rank higher in search results.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="contact" class="contact">
-            <div class="container">
-                <h2>Contact Us</h2>
-                <form class="contact-form">
-                    <input type="text" placeholder="Your Name" required>
-                    <input type="email" placeholder="Your Email" required>
-                    <textarea placeholder="Your Message" required></textarea>
-                    <button type="submit">Send Message</button>
-                </form>
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2024 My Website. All rights reserved.</p>
         </div>
-    </footer>
-
-    <script src="script.js"></script>
+    </div>
 </body>
 </html>
