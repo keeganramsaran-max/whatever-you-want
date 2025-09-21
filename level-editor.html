@@ -34,6 +34,10 @@
                     <button class="obstacle-btn" data-type="platform">Platform</button>
                     <button class="obstacle-btn" data-type="wall-top">Wall Top</button>
                     <button class="obstacle-btn" data-type="wall-bottom">Wall Bottom</button>
+                    <button class="obstacle-btn" data-type="slope-up">Slope Up ↗</button>
+                    <button class="obstacle-btn" data-type="slope-down">Slope Down ↘</button>
+                    <button class="obstacle-btn" data-type="steep-up">Steep Up ↑↗</button>
+                    <button class="obstacle-btn" data-type="steep-down">Steep Down ↓↘</button>
                 </div>
 
                 <div class="tool-section">
@@ -41,19 +45,9 @@
                     <button class="portal-btn" data-mode="cube">Cube Portal</button>
                     <button class="portal-btn" data-mode="wave">Wave Portal</button>
                     <button class="portal-btn" data-mode="ship">Ship Portal</button>
-                    <button class="portal-btn" data-mode="ball">Ball Portal</button>
+                    <!-- <button class="portal-btn" data-mode="ball">Ball Portal</button> -->
                 </div>
 
-                <div class="tool-section">
-                    <h3>Speed Portals</h3>
-                    <button class="speed-btn" data-speed="0.5">0.5x Speed</button>
-                    <button class="speed-btn" data-speed="0.75">0.75x Speed</button>
-                    <button class="speed-btn" data-speed="1.0">1x Speed</button>
-                    <button class="speed-btn" data-speed="1.5">1.5x Speed</button>
-                    <button class="speed-btn" data-speed="2.0">2x Speed</button>
-                    <button class="speed-btn" data-speed="3.0">3x Speed</button>
-                    <button class="speed-btn" data-speed="4.0">4x Speed</button>
-                </div>
 
                 <div class="tool-section">
                     <h3>Properties</h3>
@@ -68,6 +62,16 @@
 
                     <label for="objectHeight">Height:</label>
                     <input type="number" id="objectHeight" value="40" min="10" max="200">
+
+                    <label for="objectRotation">Rotation:</label>
+                    <input type="range" id="objectRotation" min="0" max="359" value="0" step="15">
+                    <span id="rotationValue">0°</span>
+
+                    <div class="rotation-buttons">
+                        <button id="rotateLeft" title="Rotate Left 15°">↶</button>
+                        <button id="rotateRight" title="Rotate Right 15°">↷</button>
+                        <button id="resetRotation" title="Reset Rotation">⌂</button>
+                    </div>
                 </div>
             </div>
 

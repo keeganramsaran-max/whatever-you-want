@@ -117,6 +117,26 @@ body {
 
 /* All buttons now use consistent styling - no individual color overrides */
 
+.rotation-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.rotation-buttons button {
+    width: 30px;
+    height: 30px;
+    padding: 5px;
+    font-size: 16px;
+    border-radius: 5px;
+}
+
+#rotationValue {
+    color: #00ff88;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
 .tool-section label {
     display: block;
     margin: 10px 0 5px 0;

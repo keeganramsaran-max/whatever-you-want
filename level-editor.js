@@ -8,7 +8,6 @@ class LevelEditor {
         this.selectedObject = null;
         this.objects = [];
         this.portals = [];
-        this.speedPortals = [];
 
         // View state
         this.camera = { x: 0, y: 0 };
@@ -29,6 +28,7 @@ class LevelEditor {
         this.currentSpeed = 1.0;
         this.objectWidth = 40;
         this.objectHeight = 40;
+        this.objectRotation = 0;
 
         this.setupEventListeners();
         this.render();
@@ -44,7 +44,7 @@ class LevelEditor {
                 this.selectedObject = null;
 
                 // Clear other button states when switching tools
-                document.querySelectorAll('.portal-btn, .speed-btn, .obstacle-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.portal-btn, , .obstacle-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
@@ -62,7 +62,7 @@ class LevelEditor {
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
                 // Clear other button states
-                document.querySelectorAll('.portal-btn, .speed-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.portal-btn, ').forEach(b => b.classList.remove('active'));
             });
         });
 
@@ -81,21 +81,21 @@ class LevelEditor {
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
                 // Clear other button states
-                document.querySelectorAll('.obstacle-btn, .speed-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.obstacle-btn, ').forEach(b => b.classList.remove('active'));
             });
         });
 
         // Speed portal selection
-        document.querySelectorAll('.speed-btn').forEach(btn => {
+        document.querySelectorAll('').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 // Remove active state from all speed buttons
-                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('').forEach(b => b.classList.remove('active'));
                 // Add active state to clicked button
                 e.target.classList.add('active');
 
                 this.currentSpeed = parseFloat(e.target.dataset.speed);
                 this.currentTool = 'place';
-                this.currentObjectType = 'speed-portal';
+                this.currentObjectType = '';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
@@ -126,6 +126,29 @@ class LevelEditor {
 
         document.getElementById('objectHeight').addEventListener('input', (e) => {
             this.objectHeight = parseInt(e.target.value);
+        });
+
+        document.getElementById('objectRotation').addEventListener('input', (e) => {
+            this.objectRotation = parseInt(e.target.value);
+            document.getElementById('rotationValue').textContent = this.objectRotation + '°';
+        });
+
+        document.getElementById('rotateLeft').addEventListener('click', () => {
+            this.objectRotation = (this.objectRotation - 15 + 360) % 360;
+            document.getElementById('objectRotation').value = this.objectRotation;
+            document.getElementById('rotationValue').textContent = this.objectRotation + '°';
+        });
+
+        document.getElementById('rotateRight').addEventListener('click', () => {
+            this.objectRotation = (this.objectRotation + 15) % 360;
+            document.getElementById('objectRotation').value = this.objectRotation;
+            document.getElementById('rotationValue').textContent = this.objectRotation + '°';
+        });
+
+        document.getElementById('resetRotation').addEventListener('click', () => {
+            this.objectRotation = 0;
+            document.getElementById('objectRotation').value = 0;
+            document.getElementById('rotationValue').textContent = '0°';
         });
 
         // Viewport controls
@@ -291,15 +314,20 @@ class LevelEditor {
             y: this.mouse.y,
             width: this.objectWidth,
             height: this.objectHeight,
-            type: this.currentObjectType
+            type: this.currentObjectType,
+            rotation: this.objectRotation
         };
 
         if (this.currentObjectType === 'portal') {
             newObject.mode = this.currentGameMode;
+            // Make portals span the full height and wider to ensure they can't be avoided
+            newObject.width = 60; // Make wider
+            newObject.height = this.canvas.height - 50; // Full height minus ground
+            newObject.y = 0; // Start from top
             this.portals.push(newObject);
-        } else if (this.currentObjectType === 'speed-portal') {
+        } else if (this.currentObjectType === '') {
             newObject.speed = this.currentSpeed;
-            this.speedPortals.push(newObject);
+            [].push(newObject);
         } else {
             this.objects.push(newObject);
         }
@@ -311,7 +339,7 @@ class LevelEditor {
         this.selectedObject = null;
 
         // Check objects
-        for (let obj of [...this.objects, ...this.portals, ...this.speedPortals]) {
+        for (let obj of [...this.objects, ...this.portals, ...[]]) {
             if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
                 this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
                 this.selectedObject = obj;
@@ -344,11 +372,11 @@ class LevelEditor {
         }
 
         // Check speed portals
-        for (let i = this.speedPortals.length - 1; i >= 0; i--) {
-            const obj = this.speedPortals[i];
+        for (let i = [].length - 1; i >= 0; i--) {
+            const obj = [][i];
             if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
                 this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
-                this.speedPortals.splice(i, 1);
+                [].splice(i, 1);
                 this.updateStats();
                 return;
             }
@@ -367,9 +395,9 @@ class LevelEditor {
             if (index !== -1) {
                 this.portals.splice(index, 1);
             } else {
-                index = this.speedPortals.indexOf(this.selectedObject);
+                index = [].indexOf(this.selectedObject);
                 if (index !== -1) {
-                    this.speedPortals.splice(index, 1);
+                    [].splice(index, 1);
                 }
             }
         }
@@ -399,11 +427,11 @@ class LevelEditor {
     }
 
     updateStats() {
-        const totalObjects = this.objects.length + this.portals.length + this.speedPortals.length;
+        const totalObjects = this.objects.length + this.portals.length + [].length;
         document.getElementById('objectCount').textContent = totalObjects;
 
         let maxX = 0;
-        [...this.objects, ...this.portals, ...this.speedPortals].forEach(obj => {
+        [...this.objects, ...this.portals, ...[]].forEach(obj => {
             maxX = Math.max(maxX, obj.x + obj.width);
         });
         document.getElementById('levelLength').textContent = maxX;
@@ -488,6 +516,80 @@ class LevelEditor {
     drawObjects() {
         this.objects.forEach(obj => {
             this.ctx.fillStyle = this.getObjectColor(obj.type);
+
+            // Handle rotation if present
+            if (obj.rotation && obj.rotation !== 0) {
+                this.drawRotatedObject(obj);
+            } else {
+                // Draw slanted objects as triangles
+                if (obj.type === 'slope-up' || obj.type === 'slope-down' ||
+                    obj.type === 'steep-up' || obj.type === 'steep-down') {
+                    this.drawSlopedObject(obj);
+                } else {
+                    this.ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                }
+
+                if (obj.type === 'platform') {
+                    this.ctx.strokeStyle = '#4CAF50';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+                }
+            }
+        });
+    }
+
+    drawSlopedObject(obj) {
+        this.ctx.beginPath();
+
+        switch (obj.type) {
+            case 'slope-up': // 45° upward slope ↗
+                this.ctx.moveTo(obj.x, obj.y + obj.height); // bottom-left
+                this.ctx.lineTo(obj.x + obj.width, obj.y); // top-right
+                this.ctx.lineTo(obj.x + obj.width, obj.y + obj.height); // bottom-right
+                break;
+            case 'slope-down': // 45° downward slope ↘
+                this.ctx.moveTo(obj.x, obj.y); // top-left
+                this.ctx.lineTo(obj.x + obj.width, obj.y + obj.height); // bottom-right
+                this.ctx.lineTo(obj.x, obj.y + obj.height); // bottom-left
+                break;
+            case 'steep-up': // 60° upward slope
+                this.ctx.moveTo(obj.x, obj.y + obj.height); // bottom-left
+                this.ctx.lineTo(obj.x + obj.width * 0.7, obj.y); // top-right (steeper)
+                this.ctx.lineTo(obj.x + obj.width, obj.y + obj.height); // bottom-right
+                break;
+            case 'steep-down': // 60° downward slope
+                this.ctx.moveTo(obj.x, obj.y); // top-left
+                this.ctx.lineTo(obj.x + obj.width * 0.7, obj.y + obj.height); // bottom-right (steeper)
+                this.ctx.lineTo(obj.x + obj.width, obj.y); // top-right
+                break;
+        }
+
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // Add stroke for better visibility
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+    }
+
+    drawRotatedObject(obj) {
+        this.ctx.save();
+
+        // Calculate center point for rotation
+        const centerX = obj.x + obj.width / 2;
+        const centerY = obj.y + obj.height / 2;
+
+        // Move to center, rotate, then move back
+        this.ctx.translate(centerX, centerY);
+        this.ctx.rotate((obj.rotation * Math.PI) / 180);
+        this.ctx.translate(-centerX, -centerY);
+
+        // Draw the object
+        if (obj.type === 'slope-up' || obj.type === 'slope-down' ||
+            obj.type === 'steep-up' || obj.type === 'steep-down') {
+            this.drawSlopedObject(obj);
+        } else {
             this.ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
 
             if (obj.type === 'platform') {
@@ -495,12 +597,24 @@ class LevelEditor {
                 this.ctx.lineWidth = 2;
                 this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
             }
-        });
+        }
+
+        this.ctx.restore();
     }
 
     drawPortals() {
         this.portals.forEach(portal => {
             this.ctx.fillStyle = this.getPortalColor(portal.mode);
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
             this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
 
             // Draw portal icon
@@ -510,12 +624,26 @@ class LevelEditor {
             this.ctx.fillText(portal.mode.toUpperCase(),
                             portal.x + portal.width/2,
                             portal.y + portal.height/2 + 4);
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
         });
     }
 
     drawSpeedPortals() {
-        this.speedPortals.forEach(portal => {
+        [].forEach(portal => {
             this.ctx.fillStyle = this.getSpeedColor(portal.speed);
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
             this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
 
             // Draw speed text
@@ -525,21 +653,63 @@ class LevelEditor {
             this.ctx.fillText(`${portal.speed}x`,
                             portal.x + portal.width/2,
                             portal.y + portal.height/2 + 3);
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
         });
     }
 
     drawPreview() {
         this.ctx.globalAlpha = 0.5;
 
+        const previewObj = {
+            x: this.mouse.x,
+            y: this.mouse.y,
+            width: this.objectWidth,
+            height: this.objectHeight,
+            type: this.currentObjectType,
+            rotation: this.objectRotation
+        };
+
         if (this.currentObjectType === 'portal') {
+            previewObj.mode = this.currentGameMode;
             this.ctx.fillStyle = this.getPortalColor(this.currentGameMode);
-        } else if (this.currentObjectType === 'speed-portal') {
+        } else if (this.currentObjectType === '') {
+            previewObj.speed = this.currentSpeed;
             this.ctx.fillStyle = this.getSpeedColor(this.currentSpeed);
         } else {
             this.ctx.fillStyle = this.getObjectColor(this.currentObjectType);
         }
 
-        this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+        // Draw preview with rotation
+        if (this.objectRotation && this.objectRotation !== 0) {
+            this.ctx.save();
+            const centerX = this.mouse.x + this.objectWidth / 2;
+            const centerY = this.mouse.y + this.objectHeight / 2;
+            this.ctx.translate(centerX, centerY);
+            this.ctx.rotate((this.objectRotation * Math.PI) / 180);
+            this.ctx.translate(-centerX, -centerY);
+        }
+
+        if (this.currentObjectType === 'portal') {
+            this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+        } else if (this.currentObjectType === '') {
+            this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+        } else {
+            // Draw slanted object preview
+            if (this.currentObjectType === 'slope-up' || this.currentObjectType === 'slope-down' ||
+                this.currentObjectType === 'steep-up' || this.currentObjectType === 'steep-down') {
+                this.drawSlopedObject(previewObj);
+            } else {
+                this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+            }
+        }
+
+        if (this.objectRotation && this.objectRotation !== 0) {
+            this.ctx.restore();
+        }
+
         this.ctx.globalAlpha = 1;
     }
 
@@ -557,7 +727,11 @@ class LevelEditor {
             'spike': '#ff4444',
             'platform': '#4CAF50',
             'wall-top': '#ff9800',
-            'wall-bottom': '#ff9800'
+            'wall-bottom': '#ff9800',
+            'slope-up': '#9C27B0',
+            'slope-down': '#9C27B0',
+            'steep-up': '#673AB7',
+            'steep-down': '#673AB7'
         };
         return colors[type] || '#ffffff';
     }
@@ -611,8 +785,7 @@ class LevelEditor {
         if (confirm('Are you sure you want to clear all objects?')) {
             this.objects = [];
             this.portals = [];
-            this.speedPortals = [];
-            this.selectedObject = null;
+                this.selectedObject = null;
             this.updateStats();
             this.render();
         }
@@ -661,7 +834,7 @@ class LevelEditor {
             difficulty: parseInt(document.getElementById('levelDifficulty').value),
             objects: this.objects,
             portals: this.portals,
-            speedPortals: this.speedPortals,
+            speedPortals: [],
             created: new Date().toISOString()
         };
 
@@ -673,7 +846,7 @@ class LevelEditor {
 
         this.objects = levelData.objects || [];
         this.portals = levelData.portals || [];
-        this.speedPortals = levelData.speedPortals || [];
+        [] = levelData.speedPortals || [];
 
         document.getElementById('levelName').value = levelData.name || 'Custom Level';
         document.getElementById('levelDifficulty').value = levelData.difficulty || 1;

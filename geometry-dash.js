@@ -36,6 +36,7 @@ class GeometryDash {
             trail: [],
             persistentWaveTrail: [],
             waveVelocity: 0,
+            waveHorizontalVelocity: 0,
             waveSpeed: 3,
             shipVelocity: 0,
             shipSpeed: 4,
@@ -55,12 +56,12 @@ class GeometryDash {
         this.obstacles = [];
         this.particles = [];
         this.portals = [];
-        this.speedPortals = [];
         this.camera = { x: 0 };
         this.baseSpeed = 3.75;
         this.speed = 3.75;
         this.speedMultiplier = 1;
         this.lastObstacle = 0;
+        this.showHitboxes = false;
 
         this.keys = {};
         this.mousePressed = false;
@@ -186,6 +187,12 @@ class GeometryDash {
             window.location.href = 'level-editor.html';
         });
 
+        document.getElementById('showHitboxesBtn').addEventListener('click', () => {
+            this.showHitboxes = !this.showHitboxes;
+            document.getElementById('showHitboxesBtn').textContent =
+                this.showHitboxes ? 'Hide Hitboxes' : 'Show Hitboxes';
+        });
+
         document.getElementById('restartBtn').addEventListener('click', () => {
             this.restartGame();
         });
@@ -235,6 +242,7 @@ class GeometryDash {
         }
         this.player.velocity = 0;
         this.player.waveVelocity = 0;
+        this.player.waveHorizontalVelocity = 0;
         this.player.shipVelocity = 0;
         this.player.ballVelocity = 0;
         this.player.rotation = 0;
@@ -286,13 +294,26 @@ class GeometryDash {
 
         const isPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
 
+        // Calculate 45-degree movement components - diagonal movement
+        // Wave should move diagonally at constant speed, not add to base speed
+        const totalSpeed = this.player.waveSpeed * this.speedMultiplier * 1.5;
+        const diagonalVertical = totalSpeed * 0.707; // sin(45°) = 0.707
+        const diagonalHorizontal = totalSpeed * 0.707; // cos(45°) = 0.707
+
         if (isPressed) {
-            this.player.waveVelocity = -this.player.waveSpeed * this.speedMultiplier;
+            // Move up-right at 45-degree angle
+            this.player.waveVelocity = -diagonalVertical; // Up movement
+            this.player.waveHorizontalVelocity = diagonalHorizontal; // Right movement
         } else {
-            this.player.waveVelocity = this.player.waveSpeed * this.speedMultiplier;
+            // Move down-right at 45-degree angle
+            this.player.waveVelocity = diagonalVertical; // Down movement
+            this.player.waveHorizontalVelocity = diagonalHorizontal; // Right movement
         }
 
         this.player.y += this.player.waveVelocity;
+
+        // Apply horizontal movement - wave always moves forward like slopes
+        this.player.x += this.player.waveHorizontalVelocity;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -426,9 +447,11 @@ class GeometryDash {
     generateLevel() {
         this.obstacles = [];
         this.portals = [];
-        this.speedPortals = [];
         this.speed = this.baseSpeed;
         this.speedMultiplier = 1;
+
+        console.log('=== GENERATING NEW LEVEL ===');
+        console.log('Game mode:', this.gameMode);
 
         if (this.isCustomLevel && this.customLevelData) {
             this.loadCustomLevel();
@@ -441,6 +464,24 @@ class GeometryDash {
         if (!this.isCustomLevel) {
             this.generateSpeedPortals();
         }
+
+        // Debug: Check what obstacles were generated
+        console.log('=== LEVEL GENERATION COMPLETE ===');
+        console.log('Total obstacles:', this.obstacles.length);
+        const obstacleTypes = {};
+        this.obstacles.forEach(obs => {
+            obstacleTypes[obs.type] = (obstacleTypes[obs.type] || 0) + 1;
+        });
+        console.log('Obstacle types:', obstacleTypes);
+
+        // Check for any wall obstacles
+        const wallObstacles = this.obstacles.filter(obs =>
+            obs.type === 'wall' || obs.type === 'wall-top' || obs.type === 'wall-bottom'
+        );
+        if (wallObstacles.length > 0) {
+            console.log('🚨 WARNING: Found wall/pillar obstacles:', wallObstacles.length);
+            console.log('Wall obstacles:', wallObstacles);
+        }
     }
 
     loadCustomLevel() {
@@ -450,7 +491,8 @@ class GeometryDash {
             y: obj.y,
             width: obj.width,
             height: obj.height,
-            type: obj.type
+            type: obj.type,
+            rotation: obj.rotation || 0
         }));
 
         // Load portals
@@ -460,17 +502,19 @@ class GeometryDash {
             width: portal.width,
             height: portal.height,
             fromMode: 'cube',
-            toMode: portal.mode
+            toMode: portal.mode,
+            rotation: portal.rotation || 0
         }));
 
         // Load speed portals
-        this.speedPortals = this.customLevelData.speedPortals.map(portal => ({
+        [] = this.customLevelData.speedPortals.map(portal => ({
             x: portal.x,
             y: portal.y,
             width: portal.width,
             height: portal.height,
             speed: portal.speed,
-            color: this.getSpeedPortalColor(portal.speed)
+            color: this.getSpeedPortalColor(portal.speed),
+            rotation: portal.rotation || 0
         }));
     }
 
@@ -501,9 +545,9 @@ class GeometryDash {
 
         return [
             { type: 'standard_jumps', mode: 'cube', x: 400, length: 1000, maxObjects: Math.floor(objectsPerLevel * 0.4) },
-            { type: 'standard_flight', mode: 'wave', x: 1400, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.25) },
-            { type: 'standard_ship', mode: 'ship', x: 2200, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.25) },
-            { type: 'standard_ball', mode: 'ball', x: 3000, length: 600, maxObjects: Math.floor(objectsPerLevel * 0.1) }
+            { type: 'standard_flight', mode: 'wave', x: 1400, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.3) },
+            { type: 'standard_ship', mode: 'ship', x: 2200, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.3) }
+            // { type: 'standard_ball', mode: 'ball', x: 3000, length: 600, maxObjects: Math.floor(objectsPerLevel * 0.1) } // Commented out ball mode
         ];
     }
 
@@ -574,6 +618,7 @@ class GeometryDash {
     }
 
     generateWaveObstacle(x, difficulty) {
+        console.log('🚨 generateWaveObstacle called! x:', x, 'difficulty:', difficulty);
         const difficultyMultiplier = this.getDifficultyMultiplier(difficulty);
         const gapSize = Math.max(60, 120 - (difficultyMultiplier - 1) * 20);
         const gapPosition = 80 + Math.random() * (this.canvas.height - 200);
@@ -589,6 +634,7 @@ class GeometryDash {
     }
 
     generateShipObstacle(x, difficulty) {
+        console.log('🚨 generateShipObstacle called! x:', x, 'difficulty:', difficulty);
         const difficultyMultiplier = this.getDifficultyMultiplier(difficulty);
         const gapSize = Math.max(80, 140 - (difficultyMultiplier - 1) * 20);
         const gapPosition = 80 + Math.random() * (this.canvas.height - 250);
@@ -644,8 +690,8 @@ class GeometryDash {
         if (this.currentLevel === 1) return;
 
         this.portals.push({
-            x: x, y: this.canvas.height - 150,
-            width: 30, height: 100,
+            x: x, y: 0,
+            width: 60, height: this.canvas.height - 50,
             fromMode: this.currentGameMode || 'cube',
             toMode: mode
         });
@@ -680,7 +726,7 @@ class GeometryDash {
         for (let x = 800; x < levelLength - 400; x += 600 + Math.random() * 400) {
             const speedMultiplier = speedMultipliers[Math.floor(Math.random() * speedMultipliers.length)];
 
-            this.speedPortals.push({
+            [].push({
                 x: x,
                 y: this.canvas.height - 120,
                 width: 25,
@@ -809,35 +855,16 @@ class GeometryDash {
     }
 
     generateBallLevel() {
+        console.log('generateBallLevel: ONLY creating spikes');
         for (let x = 400; x < 10000; x += 120 + Math.random() * 80) {
-            const type = Math.random();
-
-            if (type < 0.5) {
-                this.obstacles.push({
-                    x: x,
-                    y: this.canvas.height - 50 - 40,
-                    width: 40,
-                    height: 40,
-                    type: 'spike'
-                });
-            } else if (type < 0.8) {
-                const height = 50 + Math.random() * 60;
-                this.obstacles.push({
-                    x: x,
-                    y: this.canvas.height - 50 - height,
-                    width: 30,
-                    height: height,
-                    type: 'wall'
-                });
-            } else {
-                this.obstacles.push({
-                    x: x,
-                    y: 50 + Math.random() * 80,
-                    width: 40,
-                    height: 40,
-                    type: 'floating'
-                });
-            }
+            // ONLY bottom spikes for testing
+            this.obstacles.push({
+                x: x,
+                y: this.canvas.height - 50 - 40,
+                width: 40,
+                height: 40,
+                type: 'spike'
+            });
         }
     }
 
@@ -850,44 +877,70 @@ class GeometryDash {
             const endX = startX + sectionLength - 200;
 
             if (section > 0) {
+                // Determine what mode the NEXT section will need
+                let portalToMode;
+                if (section % 3 === 0) {
+                    portalToMode = 'cube'; // Next section is cube-only
+                } else if (section % 3 === 1) {
+                    portalToMode = 'wave'; // Next section is wave
+                } else {
+                    portalToMode = 'ship'; // Next section is ship
+                }
+
+                console.log(`Portal at x${startX - 100}: ${currentMode} → ${portalToMode} (for section ${section})`);
+
                 this.portals.push({
                     x: startX - 100,
-                    y: this.canvas.height - 150,
-                    width: 30,
-                    height: 100,
+                    y: 0,
+                    width: 60,
+                    height: this.canvas.height - 50,
                     fromMode: currentMode,
-                    toMode: this.getNextGameMode(currentMode)
+                    toMode: portalToMode
                 });
-                currentMode = this.getNextGameMode(currentMode);
             }
 
-            this.generateSectionObstacles(startX, endX, currentMode);
+            // Generate obstacles for the intended mode sequence (for level design)
+            console.log(`Section ${section}: x${startX}-${endX}, planned mode: ${currentMode}`);
+
+            // FORCE cube sections to only have cube obstacles (no pillars ever)
+            if (section % 3 === 0) { // Sections 0, 3, 6, 9 should be cube-only
+                console.log(`🎯 FORCING section ${section} to be cube-only (no pillars)`);
+                this.generateSectionObstacles(startX, endX, 'cube');
+            } else {
+                this.generateSectionObstacles(startX, endX, currentMode);
+            }
+            currentMode = this.getNextGameMode(currentMode);
         }
     }
 
     getNextGameMode(currentMode) {
-        const modes = ['cube', 'wave', 'ship', 'ball'];
+        const modes = ['cube', 'wave', 'ship']; // Removed 'ball' temporarily
+        // const modes = ['cube', 'wave', 'ship', 'ball']; // Original with ball mode
         const currentIndex = modes.indexOf(currentMode);
         return modes[(currentIndex + 1) % modes.length];
     }
 
     generateSectionObstacles(startX, endX, mode) {
-        for (let x = startX; x < endX; x += 120 + Math.random() * 80) {
+        for (let x = startX; x < endX; x += 150 + Math.random() * 50) { // More consistent spacing: 150-200px apart
             const type = Math.random();
 
             if (mode === 'cube') {
+                console.log('Cube mode: generating obstacles at x:', x);
                 if (type < 0.4) {
+                    console.log('Adding cube spike');
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
                         width: 40, height: 40, type: 'spike'
                     });
                 } else if (type < 0.7) {
+                    console.log('Adding cube platform (raised)');
                     const platformHeight = 80 + Math.random() * 60;
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - platformHeight,
                         width: 50, height: 15, type: 'platform'
                     });
                 } else {
+                    console.log('Adding cube platform (floating)');
                     const floatingY = 150 + Math.random() * 80;
                     this.obstacles.push({
                         x: x, y: floatingY,
@@ -895,30 +948,27 @@ class GeometryDash {
                     });
                 }
             } else if (mode === 'wave' || mode === 'ship') {
+                console.log(`${mode} mode: generating pillars at x:`, x);
                 const gapSize = mode === 'wave' ? 80 + Math.random() * 40 : 100 + Math.random() * 50;
                 const gapPosition = 80 + Math.random() * (this.canvas.height - 200);
 
+                console.log('Adding wall-top');
                 this.obstacles.push({
                     x: x, y: 0, width: 30,
                     height: gapPosition - gapSize/2, type: 'wall-top'
                 });
+                console.log('Adding wall-bottom');
                 this.obstacles.push({
                     x: x, y: gapPosition + gapSize/2, width: 30,
                     height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
                 });
             } else if (mode === 'ball') {
-                if (type < 0.5) {
-                    this.obstacles.push({
-                        x: x, y: this.canvas.height - 50 - 40,
-                        width: 40, height: 40, type: 'spike'
-                    });
-                } else {
-                    const height = 50 + Math.random() * 60;
-                    this.obstacles.push({
-                        x: x, y: this.canvas.height - 50 - height,
-                        width: 30, height: height, type: 'wall'
-                    });
-                }
+                console.log('Ball mode: ONLY generating spikes');
+                // ONLY bottom spikes for testing
+                this.obstacles.push({
+                    x: x, y: this.canvas.height - 50 - 40,
+                    width: 40, height: 40, type: 'spike'
+                });
             }
         }
     }
@@ -931,6 +981,58 @@ class GeometryDash {
             width: this.player.width - (offset * 2),
             height: this.player.height - (offset * 2)
         };
+    }
+
+    rotatePoint(point, centerX, centerY, angle) {
+        // Convert angle to radians
+        const rad = (angle * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // Translate point to origin
+        const translatedX = point.x - centerX;
+        const translatedY = point.y - centerY;
+
+        // Rotate point
+        const rotatedX = translatedX * cos - translatedY * sin;
+        const rotatedY = translatedX * sin + translatedY * cos;
+
+        // Translate back
+        return {
+            x: rotatedX + centerX,
+            y: rotatedY + centerY
+        };
+    }
+
+    getRotatedHitboxCorners(obstacle) {
+        // Get base hitbox
+        const hitbox = this.getObstacleHitbox(obstacle);
+
+        if (!obstacle.rotation || obstacle.rotation === 0) {
+            // No rotation, return regular corners
+            return [
+                { x: hitbox.x, y: hitbox.y }, // top-left
+                { x: hitbox.x + hitbox.width, y: hitbox.y }, // top-right
+                { x: hitbox.x + hitbox.width, y: hitbox.y + hitbox.height }, // bottom-right
+                { x: hitbox.x, y: hitbox.y + hitbox.height } // bottom-left
+            ];
+        }
+
+        // Calculate rotation center
+        const centerX = obstacle.x + obstacle.width / 2;
+        const centerY = obstacle.y + obstacle.height / 2;
+
+        // Get hitbox corners and rotate them
+        const corners = [
+            { x: hitbox.x, y: hitbox.y }, // top-left
+            { x: hitbox.x + hitbox.width, y: hitbox.y }, // top-right
+            { x: hitbox.x + hitbox.width, y: hitbox.y + hitbox.height }, // bottom-right
+            { x: hitbox.x, y: hitbox.y + hitbox.height } // bottom-left
+        ];
+
+        return corners.map(corner =>
+            this.rotatePoint(corner, centerX, centerY, obstacle.rotation)
+        );
     }
 
     getObstacleHitbox(obstacle) {
@@ -959,6 +1061,190 @@ class GeometryDash {
                hitbox1.x + hitbox1.width > hitbox2.x &&
                hitbox1.y < hitbox2.y + hitbox2.height &&
                hitbox1.y + hitbox1.height > hitbox2.y;
+    }
+
+    checkRotatedRectangleCollision(playerHitbox, obstacle) {
+        // Get rotated corners of the obstacle
+        const obstacleCorners = this.getRotatedHitboxCorners(obstacle);
+
+        // Get player corners
+        const playerCorners = [
+            { x: playerHitbox.x, y: playerHitbox.y }, // top-left
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y }, // top-right
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y + playerHitbox.height }, // bottom-right
+            { x: playerHitbox.x, y: playerHitbox.y + playerHitbox.height } // bottom-left
+        ];
+
+        // Check if any player corner is inside the rotated obstacle
+        for (let corner of playerCorners) {
+            if (this.isPointInRotatedRectangle(corner, obstacleCorners)) {
+                return true;
+            }
+        }
+
+        // Check if any obstacle corner is inside the player rectangle
+        for (let corner of obstacleCorners) {
+            if (corner.x >= playerHitbox.x && corner.x <= playerHitbox.x + playerHitbox.width &&
+                corner.y >= playerHitbox.y && corner.y <= playerHitbox.y + playerHitbox.height) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    isPointInRotatedRectangle(point, corners) {
+        // Use the "winding number" algorithm to check if point is inside polygon
+        let windingNumber = 0;
+
+        for (let i = 0; i < corners.length; i++) {
+            const current = corners[i];
+            const next = corners[(i + 1) % corners.length];
+
+            if (current.y <= point.y) {
+                if (next.y > point.y) { // upward crossing
+                    if (this.isLeft(current, next, point) > 0) {
+                        windingNumber++;
+                    }
+                }
+            } else {
+                if (next.y <= point.y) { // downward crossing
+                    if (this.isLeft(current, next, point) < 0) {
+                        windingNumber--;
+                    }
+                }
+            }
+        }
+
+        return windingNumber !== 0;
+    }
+
+    isLeft(p0, p1, p2) {
+        // Test if point p2 is left|on|right of an infinite line p0p1
+        return ((p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y));
+    }
+
+    checkSpikeCollision(playerHitbox, obstacle) {
+        // Get the triangle points for the spike
+        const trianglePoints = this.getSpikeTrianglePoints(obstacle);
+
+        // Check if any corner of the player's hitbox is inside the triangle
+        const playerCorners = [
+            { x: playerHitbox.x, y: playerHitbox.y }, // top-left
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y }, // top-right
+            { x: playerHitbox.x, y: playerHitbox.y + playerHitbox.height }, // bottom-left
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y + playerHitbox.height } // bottom-right
+        ];
+
+        for (let corner of playerCorners) {
+            if (this.isPointInTriangle(corner, trianglePoints[0], trianglePoints[1], trianglePoints[2])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    checkSlopedCollision(playerHitbox, obstacle) {
+        // Get the triangle points for the slanted obstacle
+        const trianglePoints = this.getSlopeTrianglePoints(obstacle);
+
+        // Check if any corner of the player's hitbox is inside the triangle
+        const playerCorners = [
+            { x: playerHitbox.x, y: playerHitbox.y }, // top-left
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y }, // top-right
+            { x: playerHitbox.x, y: playerHitbox.y + playerHitbox.height }, // bottom-left
+            { x: playerHitbox.x + playerHitbox.width, y: playerHitbox.y + playerHitbox.height } // bottom-right
+        ];
+
+        for (let corner of playerCorners) {
+            if (this.isPointInTriangle(corner, trianglePoints[0], trianglePoints[1], trianglePoints[2])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    getSpikeTrianglePoints(obstacle) {
+        // Add inset margin to make spike hitbox smaller than visual shape
+        const inset = 6; // 6 pixels smaller on each side for spikes
+
+        // Spike triangle: top point in center, base at bottom
+        const points = [
+            { x: obstacle.x + obstacle.width/2, y: obstacle.y + inset }, // top point (inset from top)
+            { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset }, // bottom-left (inset)
+            { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset } // bottom-right (inset)
+        ];
+
+        // Apply rotation if present
+        if (obstacle.rotation && obstacle.rotation !== 0) {
+            const centerX = obstacle.x + obstacle.width / 2;
+            const centerY = obstacle.y + obstacle.height / 2;
+            return points.map(point =>
+                this.rotatePoint(point, centerX, centerY, obstacle.rotation)
+            );
+        }
+
+        return points;
+    }
+
+    getSlopeTrianglePoints(obstacle) {
+        // Add inset margin to make hitbox smaller than visual shape
+        const inset = 8; // 8 pixels smaller on each side
+
+        let points;
+        switch (obstacle.type) {
+            case 'slope-up': // 45° upward slope ↗
+                points = [
+                    { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset }, // bottom-left (inset)
+                    { x: obstacle.x + obstacle.width - inset, y: obstacle.y + inset }, // top-right (inset)
+                    { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset } // bottom-right (inset)
+                ];
+                break;
+            case 'slope-down': // 45° downward slope ↘
+                points = [
+                    { x: obstacle.x + inset, y: obstacle.y + inset }, // top-left (inset)
+                    { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset }, // bottom-right (inset)
+                    { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset } // bottom-left (inset)
+                ];
+                break;
+            case 'steep-up': // 60° upward slope
+                points = [
+                    { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset }, // bottom-left (inset)
+                    { x: obstacle.x + (obstacle.width * 0.7) - inset, y: obstacle.y + inset }, // top-right (steeper, inset)
+                    { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset } // bottom-right (inset)
+                ];
+                break;
+            case 'steep-down': // 60° downward slope
+                points = [
+                    { x: obstacle.x + inset, y: obstacle.y + inset }, // top-left (inset)
+                    { x: obstacle.x + (obstacle.width * 0.7) - inset, y: obstacle.y + obstacle.height - inset }, // bottom-right (steeper, inset)
+                    { x: obstacle.x + obstacle.width - inset, y: obstacle.y + inset } // top-right (inset)
+                ];
+                break;
+        }
+
+        // Apply rotation if present
+        if (obstacle.rotation && obstacle.rotation !== 0) {
+            const centerX = obstacle.x + obstacle.width / 2;
+            const centerY = obstacle.y + obstacle.height / 2;
+            return points.map(point =>
+                this.rotatePoint(point, centerX, centerY, obstacle.rotation)
+            );
+        }
+
+        return points;
+    }
+
+    isPointInTriangle(point, v1, v2, v3) {
+        // Use barycentric coordinates to check if point is inside triangle
+        const denominator = (v2.y - v3.y) * (v1.x - v3.x) + (v3.x - v2.x) * (v1.y - v3.y);
+        const a = ((v2.y - v3.y) * (point.x - v3.x) + (v3.x - v2.x) * (point.y - v3.y)) / denominator;
+        const b = ((v3.y - v1.y) * (point.x - v3.x) + (v1.x - v3.x) * (point.y - v3.y)) / denominator;
+        const c = 1 - a - b;
+
+        return a >= 0 && b >= 0 && c >= 0;
     }
 
     checkCollisions() {
@@ -1016,11 +1302,35 @@ class GeometryDash {
                     }
                 }
             } else {
-                // Use smaller hitbox for deadly obstacles
-                const obstacleHitbox = this.getObstacleHitbox(obstacle);
-                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
-                    this.gameOver();
-                    return;
+                // Check for spike collision (triangular)
+                if (obstacle.type === 'spike') {
+                    if (this.checkSpikeCollision(playerHitbox, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
+                           obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
+                    // Check for slanted obstacle collision
+                    if (this.checkSlopedCollision(playerHitbox, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                } else {
+                    // Use smaller hitbox for regular deadly obstacles
+                    if (obstacle.rotation && obstacle.rotation !== 0) {
+                        // Use rotated rectangle collision for rotated objects
+                        if (this.checkRotatedRectangleCollision(playerHitbox, obstacle)) {
+                            this.gameOver();
+                            return;
+                        }
+                    } else {
+                        // Use regular collision for non-rotated objects
+                        const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                        if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                            this.gameOver();
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -1070,11 +1380,35 @@ class GeometryDash {
                     }
                 }
             } else {
-                // Use smaller hitbox for deadly obstacles
-                const obstacleHitbox = this.getObstacleHitbox(obstacle);
-                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
-                    this.gameOver();
-                    return;
+                // Check for spike collision (triangular)
+                if (obstacle.type === 'spike') {
+                    if (this.checkSpikeCollision(playerHitbox, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
+                           obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
+                    // Check for slanted obstacle collision
+                    if (this.checkSlopedCollision(playerHitbox, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                } else {
+                    // Use smaller hitbox for regular deadly obstacles
+                    if (obstacle.rotation && obstacle.rotation !== 0) {
+                        // Use rotated rectangle collision for rotated objects
+                        if (this.checkRotatedRectangleCollision(playerHitbox, obstacle)) {
+                            this.gameOver();
+                            return;
+                        }
+                    } else {
+                        // Use regular collision for non-rotated objects
+                        const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                        if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                            this.gameOver();
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -1087,22 +1421,48 @@ class GeometryDash {
             if (this.player.y <= 0) {
                 this.player.y = 0;
                 this.player.waveVelocity = 0;
+                this.player.waveHorizontalVelocity = 0;
                 this.player.shipVelocity = 0;
             }
             if (this.player.y + this.player.height >= this.canvas.height - 50) {
                 this.player.y = this.canvas.height - 50 - this.player.height;
                 this.player.waveVelocity = 0;
+                this.player.waveHorizontalVelocity = 0;
                 this.player.shipVelocity = 0;
+            }
+
+            // For wave mode, only check left boundary (prevent going backward)
+            if (mode === 'wave') {
+                if (this.player.x <= 0) {
+                    this.player.x = 0;
+                    this.player.waveHorizontalVelocity = 0;
+                }
+                // Remove right boundary check - wave should be able to move forward indefinitely
             }
         }
 
         const playerHitbox = this.getPlayerHitbox();
 
         for (let obstacle of this.obstacles) {
-            const obstacleHitbox = this.getObstacleHitbox(obstacle);
-            if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
-                this.gameOver();
-                return;
+            // Check for spike collision (triangular)
+            if (obstacle.type === 'spike') {
+                if (this.checkSpikeCollision(playerHitbox, obstacle)) {
+                    this.gameOver();
+                    return;
+                }
+            } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
+                       obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
+                // Check for slanted obstacle collision
+                if (this.checkSlopedCollision(playerHitbox, obstacle)) {
+                    this.gameOver();
+                    return;
+                }
+            } else {
+                const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                    this.gameOver();
+                    return;
+                }
             }
         }
     }
@@ -1296,6 +1656,16 @@ class GeometryDash {
                 continue;
             }
 
+            // Handle rotation if present
+            if (obstacle.rotation && obstacle.rotation !== 0) {
+                this.ctx.save();
+                const centerX = obstacle.x + obstacle.width / 2;
+                const centerY = obstacle.y + obstacle.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((obstacle.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
             if (obstacle.type === 'spike') {
                 this.ctx.fillStyle = '#ff4444';
                 this.ctx.beginPath();
@@ -1340,10 +1710,62 @@ class GeometryDash {
                 this.ctx.fillStyle = '#ffffff';
                 this.ctx.fillRect(obstacle.x + 2, obstacle.y + 2, obstacle.width - 4, 3);
                 this.ctx.fillRect(obstacle.x + 2, obstacle.y + obstacle.height - 5, obstacle.width - 4, 3);
+            } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
+                       obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
+                this.drawSlopedObstacle(obstacle);
+            }
+
+            // Restore rotation if applied
+            if (obstacle.rotation && obstacle.rotation !== 0) {
+                this.ctx.restore();
             }
         }
 
         this.ctx.restore();
+    }
+
+    drawSlopedObstacle(obstacle) {
+        // Set colors based on obstacle type
+        const colors = {
+            'slope-up': '#9C27B0',
+            'slope-down': '#9C27B0',
+            'steep-up': '#673AB7',
+            'steep-down': '#673AB7'
+        };
+
+        this.ctx.fillStyle = colors[obstacle.type] || '#ffffff';
+        this.ctx.beginPath();
+
+        switch (obstacle.type) {
+            case 'slope-up': // 45° upward slope ↗
+                this.ctx.moveTo(obstacle.x, obstacle.y + obstacle.height); // bottom-left
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y); // top-right
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height); // bottom-right
+                break;
+            case 'slope-down': // 45° downward slope ↘
+                this.ctx.moveTo(obstacle.x, obstacle.y); // top-left
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height); // bottom-right
+                this.ctx.lineTo(obstacle.x, obstacle.y + obstacle.height); // bottom-left
+                break;
+            case 'steep-up': // 60° upward slope
+                this.ctx.moveTo(obstacle.x, obstacle.y + obstacle.height); // bottom-left
+                this.ctx.lineTo(obstacle.x + obstacle.width * 0.7, obstacle.y); // top-right (steeper)
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height); // bottom-right
+                break;
+            case 'steep-down': // 60° downward slope
+                this.ctx.moveTo(obstacle.x, obstacle.y); // top-left
+                this.ctx.lineTo(obstacle.x + obstacle.width * 0.7, obstacle.y + obstacle.height); // bottom-right (steeper)
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y); // top-right
+                break;
+        }
+
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // Add stroke for better visibility
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
     }
 
     drawParticles() {
@@ -1374,15 +1796,17 @@ class GeometryDash {
         for (let portal of this.portals) {
             if (portal.used) continue;
 
-            // Use slightly larger hitbox for portals for easier activation
+            // Use hitbox that fits inside the portal visual boundaries
             const portalHitbox = {
-                x: portal.x - 2,
-                y: portal.y - 2,
-                width: portal.width + 4,
-                height: portal.height + 4
+                x: portal.x + 2,
+                y: portal.y + 2,
+                width: portal.width - 4,
+                height: portal.height - 4
             };
 
             if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
+                console.log(`🌀 Portal hit! ${portal.fromMode} → ${portal.toMode} at x: ${portal.x}`);
+
                 // Clear persistent wave trail when switching away from wave mode
                 if (this.currentGameMode === 'wave' && portal.toMode !== 'wave') {
                     this.player.persistentWaveTrail = [];
@@ -1395,6 +1819,7 @@ class GeometryDash {
                     this.player.y = (this.canvas.height - 50) / 2 - this.player.height / 2;
                     this.player.velocity = 0;
                     this.player.waveVelocity = 0;
+                    this.player.waveHorizontalVelocity = 0;
                     this.player.shipVelocity = 0;
                 }
 
@@ -1442,6 +1867,16 @@ class GeometryDash {
                 ball: '#ff00ff'
             };
 
+            // Handle rotation if present
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
             this.ctx.fillStyle = colors[portal.toMode] || '#ffffff';
             this.ctx.globalAlpha = 0.8;
             this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
@@ -1459,6 +1894,11 @@ class GeometryDash {
                 portal.x + portal.width/2,
                 portal.y + portal.height/2 + 4
             );
+
+            // Restore rotation if applied
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
         }
 
         this.ctx.restore();
@@ -1468,12 +1908,22 @@ class GeometryDash {
         this.ctx.save();
         this.ctx.translate(-this.camera.x, 0);
 
-        for (let portal of this.speedPortals) {
+        for (let portal of []) {
             if (portal.used) continue;
 
             if (portal.x + portal.width < this.camera.x - 100 ||
                 portal.x > this.camera.x + this.canvas.width + 100) {
                 continue;
+            }
+
+            // Handle rotation if present
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
             }
 
             this.ctx.fillStyle = portal.color;
@@ -1489,10 +1939,15 @@ class GeometryDash {
             this.ctx.font = 'bold 12px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.fillText(
-                `${portal.speedMultiplier}x`,
+                `${portal.speed}x`,
                 portal.x + portal.width/2,
                 portal.y + portal.height/2 + 4
             );
+
+            // Restore rotation if applied
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
 
             const time = Date.now() * 0.005;
             this.ctx.globalAlpha = 0.3 + Math.sin(time + portal.x * 0.01) * 0.3;
@@ -1503,43 +1958,6 @@ class GeometryDash {
         this.ctx.restore();
     }
 
-    checkSpeedPortalCollisions() {
-        const playerHitbox = this.getPlayerHitbox();
-
-        for (let portal of this.speedPortals) {
-            if (portal.used) continue;
-
-            // Use slightly larger hitbox for speed portals for easier activation
-            const portalHitbox = {
-                x: portal.x - 2,
-                y: portal.y - 2,
-                width: portal.width + 4,
-                height: portal.height + 4
-            };
-
-            if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
-                this.speedMultiplier = portal.speed;
-                this.speed = this.baseSpeed * this.speedMultiplier;
-
-                this.playSound('jump');
-
-                for (let i = 0; i < 15; i++) {
-                    this.particles.push({
-                        x: portal.x + portal.width/2,
-                        y: portal.y + portal.height/2,
-                        vx: (Math.random() - 0.5) * 12,
-                        vy: (Math.random() - 0.5) * 12,
-                        life: 1.5,
-                        decay: 0.02,
-                        color: portal.color
-                    });
-                }
-
-                portal.used = true;
-                break;
-            }
-        }
-    }
 
     checkLevelCompletion() {
         const levelLength = this.getLevelLength();
@@ -1637,7 +2055,11 @@ class GeometryDash {
     update() {
         if (this.gameState !== 'playing') return;
 
-        this.player.x += this.speed;
+        // For wave mode, horizontal movement is handled in handleWaveMovement
+        const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+        if (mode !== 'wave') {
+            this.player.x += this.speed;
+        }
         this.score = Math.floor(this.player.x / 10);
 
         this.updatePlayer();
@@ -1645,10 +2067,118 @@ class GeometryDash {
         this.updateParticles();
         this.checkCollisions();
         this.checkPortalCollisions();
-        this.checkSpeedPortalCollisions();
         this.checkLevelCompletion();
 
         document.getElementById('score').textContent = this.score;
+    }
+
+    drawHitboxes() {
+        this.ctx.save();
+        this.ctx.translate(-this.camera.x, 0);
+
+        // Draw player hitbox
+        const playerHitbox = this.getPlayerHitbox();
+        this.ctx.strokeStyle = '#00FF00'; // Green for player
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeRect(playerHitbox.x, playerHitbox.y, playerHitbox.width, playerHitbox.height);
+
+        // Draw obstacle hitboxes
+        for (let obstacle of this.obstacles) {
+            if (obstacle.x + obstacle.width < this.camera.x - 100 ||
+                obstacle.x > this.camera.x + this.canvas.width + 100) {
+                continue;
+            }
+
+            if (obstacle.type === 'spike') {
+                // Draw spike triangle hitbox
+                const trianglePoints = this.getSpikeTrianglePoints(obstacle);
+                this.ctx.strokeStyle = '#FF0000'; // Red for deadly spikes
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([3, 3]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(trianglePoints[0].x, trianglePoints[0].y);
+                this.ctx.lineTo(trianglePoints[1].x, trianglePoints[1].y);
+                this.ctx.lineTo(trianglePoints[2].x, trianglePoints[2].y);
+                this.ctx.closePath();
+                this.ctx.stroke();
+            } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
+                       obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
+                // Draw sloped obstacle triangle hitbox
+                const trianglePoints = this.getSlopeTrianglePoints(obstacle);
+                this.ctx.strokeStyle = '#FF0000'; // Red for deadly obstacles
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([3, 3]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(trianglePoints[0].x, trianglePoints[0].y);
+                this.ctx.lineTo(trianglePoints[1].x, trianglePoints[1].y);
+                this.ctx.lineTo(trianglePoints[2].x, trianglePoints[2].y);
+                this.ctx.closePath();
+                this.ctx.stroke();
+            } else {
+                // Draw regular obstacle hitbox
+                if (obstacle.rotation && obstacle.rotation !== 0) {
+                    // Draw rotated rectangle hitbox
+                    const corners = this.getRotatedHitboxCorners(obstacle);
+                    if (obstacle.type === 'platform') {
+                        this.ctx.strokeStyle = '#0088FF'; // Blue for platforms
+                    } else {
+                        this.ctx.strokeStyle = '#FF0000'; // Red for deadly obstacles
+                    }
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([3, 3]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(corners[0].x, corners[0].y);
+                    this.ctx.lineTo(corners[1].x, corners[1].y);
+                    this.ctx.lineTo(corners[2].x, corners[2].y);
+                    this.ctx.lineTo(corners[3].x, corners[3].y);
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                } else {
+                    // Draw regular non-rotated hitbox
+                    const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                    if (obstacle.type === 'platform') {
+                        this.ctx.strokeStyle = '#0088FF'; // Blue for platforms
+                    } else {
+                        this.ctx.strokeStyle = '#FF0000'; // Red for deadly obstacles
+                    }
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([3, 3]);
+                    this.ctx.strokeRect(obstacleHitbox.x, obstacleHitbox.y, obstacleHitbox.width, obstacleHitbox.height);
+                }
+            }
+        }
+
+        // Draw portal hitboxes
+        for (let portal of this.portals) {
+            if (portal.used) continue;
+            if (portal.x + portal.width < this.camera.x - 100 ||
+                portal.x > this.camera.x + this.canvas.width + 100) {
+                continue;
+            }
+
+            this.ctx.strokeStyle = '#FFFF00'; // Yellow for portals
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([4, 4]);
+            this.ctx.strokeRect(portal.x + 2, portal.y + 2, portal.width - 4, portal.height - 4);
+        }
+
+        // Draw speed portal hitboxes
+        for (let portal of []) {
+            if (portal.used) continue;
+            if (portal.x + portal.width < this.camera.x - 100 ||
+                portal.x > this.camera.x + this.canvas.width + 100) {
+                continue;
+            }
+
+            this.ctx.strokeStyle = '#FF00FF'; // Magenta for speed portals
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([4, 4]);
+            this.ctx.strokeRect(portal.x + 2, portal.y + 2, portal.width - 4, portal.height - 4);
+        }
+
+        this.ctx.setLineDash([]); // Reset line dash
+        this.ctx.restore();
     }
 
     render() {
@@ -1660,6 +2190,10 @@ class GeometryDash {
         this.drawSpeedPortals();
         this.drawParticles();
         this.drawPlayer();
+
+        if (this.showHitboxes) {
+            this.drawHitboxes();
+        }
     }
 
     startGame() {
