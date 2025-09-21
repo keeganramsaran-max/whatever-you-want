@@ -62,6 +62,14 @@ class GeometryDash {
         this.speedMultiplier = 1;
         this.lastObstacle = 0;
         this.showHitboxes = false;
+        this.autoPlay = false;
+        this.autoPlayClickTimer = 0;
+        this.autoPlayClickInterval = 3;
+        this.lastJumpTime = 0;
+        this.lastWaveAction = 0;
+        this.lastShipAction = 0;
+        this.currentWaveDirection = null; // 'up', 'down', or null
+        this.lastJumpedObstacle = null; // Track which obstacle we last jumped for
 
         this.keys = {};
         this.mousePressed = false;
@@ -191,6 +199,10 @@ class GeometryDash {
             this.showHitboxes = !this.showHitboxes;
             document.getElementById('showHitboxesBtn').textContent =
                 this.showHitboxes ? 'Hide Hitboxes' : 'Show Hitboxes';
+        });
+
+        document.getElementById('autoPlayBtn').addEventListener('click', () => {
+            this.toggleAutoPlay();
         });
 
         document.getElementById('restartBtn').addEventListener('click', () => {
@@ -543,10 +555,16 @@ class GeometryDash {
         const baseObjects = 15;
         const objectsPerLevel = baseObjects + (this.currentLevel - 1) * 10;
 
+        // Increase level length based on difficulty
+        const lengthMultiplier = 1 + (this.currentLevel - 1) * 0.5; // Each level adds 50% more length
+        const baseCubeLength = 1000 * lengthMultiplier;
+        const baseWaveLength = 800 * lengthMultiplier;
+        const baseShipLength = 800 * lengthMultiplier;
+
         return [
-            { type: 'standard_jumps', mode: 'cube', x: 400, length: 1000, maxObjects: Math.floor(objectsPerLevel * 0.4) },
-            { type: 'standard_flight', mode: 'wave', x: 1400, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.3) },
-            { type: 'standard_ship', mode: 'ship', x: 2200, length: 800, maxObjects: Math.floor(objectsPerLevel * 0.3) }
+            { type: 'standard_jumps', mode: 'cube', x: 400, length: baseCubeLength, maxObjects: Math.floor(objectsPerLevel * 0.4) },
+            { type: 'standard_flight', mode: 'wave', x: 400 + baseCubeLength, length: baseWaveLength, maxObjects: Math.floor(objectsPerLevel * 0.3) },
+            { type: 'standard_ship', mode: 'ship', x: 400 + baseCubeLength + baseWaveLength, length: baseShipLength, maxObjects: Math.floor(objectsPerLevel * 0.3) }
             // { type: 'standard_ball', mode: 'ball', x: 3000, length: 600, maxObjects: Math.floor(objectsPerLevel * 0.1) } // Commented out ball mode
         ];
     }
@@ -1468,6 +1486,11 @@ class GeometryDash {
     }
 
     updatePlayer() {
+        // Auto-play logic
+        if (this.autoPlay) {
+            this.handleAutoPlay();
+        }
+
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
 
         switch (mode) {
@@ -1982,6 +2005,27 @@ class GeometryDash {
     }
 
     levelComplete() {
+        if (this.autoPlay) {
+            // Auto-progress to next level
+            if (this.currentLevel < this.maxLevel) {
+                this.currentLevel++;
+                document.getElementById('levelSelect').value = this.currentLevel;
+                document.getElementById('currentLevel').textContent = this.currentLevel;
+                setTimeout(() => {
+                    this.restartGame();
+                }, 1000);
+            } else {
+                // Completed all levels, restart from level 1
+                this.currentLevel = 1;
+                document.getElementById('levelSelect').value = 1;
+                document.getElementById('currentLevel').textContent = 1;
+                setTimeout(() => {
+                    this.restartGame();
+                }, 1000);
+            }
+            return;
+        }
+
         this.gameState = 'levelComplete';
         this.playSound('jump');
 
@@ -2216,7 +2260,388 @@ class GeometryDash {
         }
     }
 
+    toggleAutoPlay() {
+        this.autoPlay = !this.autoPlay;
+        const autoPlayBtn = document.getElementById('autoPlayBtn');
+        autoPlayBtn.textContent = this.autoPlay ? 'Stop Auto Play' : 'Auto Play';
+
+        if (this.autoPlay) {
+            this.startGame();
+        }
+    }
+
+    handleAutoPlay() {
+        const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+
+        // Dynamic look-ahead based on speed and mode
+        let lookAheadDistance = 300; // Base look ahead
+        if (mode === 'wave' || mode === 'ship') {
+            lookAheadDistance = 400; // More look ahead for flying modes
+        }
+        lookAheadDistance *= this.speedMultiplier; // Scale with game speed
+
+        const playerCenterX = this.player.x + this.player.width / 2;
+        const playerCenterY = this.player.y + this.player.height / 2;
+        const playerBottom = this.player.y + this.player.height;
+
+        // Find all obstacles in extended range and sort by distance
+        let obstaclesInRange = [];
+        let immediateObstacles = [];
+        let futureObstacles = [];
+
+        for (let obstacle of this.obstacles) {
+            const distance = obstacle.x - playerCenterX;
+            if (distance > -100 && distance < lookAheadDistance) {
+                const obstacleData = { obstacle, distance };
+                obstaclesInRange.push(obstacleData);
+
+                // Categorize obstacles by urgency
+                if (distance < 150) {
+                    immediateObstacles.push(obstacleData);
+                } else {
+                    futureObstacles.push(obstacleData);
+                }
+            }
+        }
+
+        obstaclesInRange.sort((a, b) => a.distance - b.distance);
+        immediateObstacles.sort((a, b) => a.distance - b.distance);
+        futureObstacles.sort((a, b) => a.distance - b.distance);
+
+        // Ground collision check for cube mode
+        if (mode === 'cube') {
+            if (playerBottom >= this.canvas.height - 50) {
+                this.player.y = this.canvas.height - 50 - this.player.height;
+                this.player.velocity = 0;
+                this.player.onGround = true;
+            }
+        }
+
+        if (obstaclesInRange.length > 0) {
+            switch (mode) {
+                case 'cube':
+                    // Precise cube jumping with optimal timing
+                    let shouldJump = false;
+                    let optimalDistance = 0;
+
+                    // Only consider the closest dangerous obstacle
+                    if (immediateObstacles.length > 0) {
+                        const nextObstacle = immediateObstacles[0].obstacle;
+                        const obstacleDistance = immediateObstacles[0].distance;
+
+                        // Only jump for obstacles that actually require jumping
+                        if (nextObstacle.type === 'spike' || nextObstacle.type === 'platform' ||
+                            nextObstacle.type === 'slope-up' || nextObstacle.type === 'slope-down' ||
+                            nextObstacle.type === 'steep-up' || nextObstacle.type === 'steep-down') {
+
+                            // Calculate jump timing based on obstacle type and distance
+                            const obstacleId = `${nextObstacle.x}-${nextObstacle.y}-${nextObstacle.type}`;
+                            const alreadyJumpedForThisObstacle = this.lastJumpedObstacle === obstacleId;
+
+                            if (!alreadyJumpedForThisObstacle && this.player.onGround) {
+                                // More forgiving jump ranges for better survival
+                                let jumpRange = { min: 60, max: 120 };
+
+                                if (nextObstacle.type === 'spike') {
+                                    jumpRange = { min: 70, max: 110 }; // Closer for spikes
+                                } else if (nextObstacle.type === 'platform') {
+                                    jumpRange = { min: 80, max: 130 }; // Earlier for platforms
+                                } else {
+                                    jumpRange = { min: 75, max: 120 }; // Default for slopes
+                                }
+
+                                // Jump if within the safe range
+                                if (obstacleDistance >= jumpRange.min &&
+                                    obstacleDistance <= jumpRange.max &&
+                                    this.canJumpNow()) {
+                                    shouldJump = true;
+                                    this.lastJumpedObstacle = obstacleId;
+                                }
+                                // Emergency jump - more aggressive
+                                else if (obstacleDistance < 60 && this.canJumpNow()) {
+                                    shouldJump = true;
+                                    this.lastJumpedObstacle = obstacleId;
+                                }
+                            }
+                        }
+                    }
+
+                    if (shouldJump) {
+                        this.jump();
+                        this.lastJumpTime = Date.now();
+                    }
+
+                    // Clear obstacle tracking if we've passed all immediate obstacles
+                    if (immediateObstacles.length === 0) {
+                        this.lastJumpedObstacle = null;
+                    }
+                    break;
+
+                case 'wave':
+                    // Advanced wave navigation with predictive path planning
+                    let needsDodging = false;
+                    let shouldGoUp = false;
+                    let urgencyLevel = 0; // 0=safe, 1=plan, 2=react, 3=emergency
+
+                    // Priority 1: Avoid ceiling and floor boundaries (more forgiving)
+                    if (playerCenterY < 50) {
+                        shouldGoUp = false;
+                        needsDodging = true;
+                        urgencyLevel = 3;
+                    } else if (playerCenterY > this.canvas.height - 100) {
+                        shouldGoUp = true;
+                        needsDodging = true;
+                        urgencyLevel = 3;
+                    }
+
+                    // Priority 2: React to immediate obstacles
+                    if (!needsDodging && immediateObstacles.length > 0) {
+                        const immediateObstacle = immediateObstacles[0].obstacle;
+                        const immediateDistance = immediateObstacles[0].distance;
+                        const obstacleBottom = immediateObstacle.y + immediateObstacle.height;
+                        const obstacleTop = immediateObstacle.y;
+                        const safeMargin = 35; // Reduced margin for more aggressive dodging
+
+                        if (immediateDistance < 120) { // Increased reaction distance
+                            if (playerCenterY > obstacleBottom + safeMargin) {
+                                shouldGoUp = true;
+                                needsDodging = true;
+                                urgencyLevel = 2;
+                            } else if (playerCenterY < obstacleTop - safeMargin) {
+                                shouldGoUp = false;
+                                needsDodging = true;
+                                urgencyLevel = 2;
+                            }
+                            // Emergency gap threading
+                            else if (playerCenterY >= obstacleTop - safeMargin &&
+                                     playerCenterY <= obstacleBottom + safeMargin) {
+                                const topSpace = obstacleTop - 60;
+                                const bottomSpace = (this.canvas.height - 60) - obstacleBottom;
+
+                                if (topSpace > bottomSpace + 30) {
+                                    shouldGoUp = true;
+                                    needsDodging = true;
+                                    urgencyLevel = 2;
+                                } else if (bottomSpace > topSpace + 30) {
+                                    shouldGoUp = false;
+                                    needsDodging = true;
+                                    urgencyLevel = 2;
+                                }
+                            }
+                        }
+                    }
+
+                    // Priority 3: Plan for future obstacles (predictive movement)
+                    if (!needsDodging && futureObstacles.length > 0) {
+                        const futureObstacle = futureObstacles[0].obstacle;
+                        const futureDistance = futureObstacles[0].distance;
+
+                        if (futureDistance < 300) {
+                            const futureBottom = futureObstacle.y + futureObstacle.height;
+                            const futureTop = futureObstacle.y;
+                            const predictMargin = 60;
+
+                            // Predict where we need to be and start moving early
+                            const currentTrajectory = this.player.waveVelocity;
+                            const timeToObstacle = futureDistance / (this.speed + Math.abs(this.player.waveHorizontalVelocity));
+                            const predictedY = playerCenterY + (currentTrajectory * timeToObstacle);
+
+                            if (predictedY > futureBottom + predictMargin) {
+                                shouldGoUp = true;
+                                needsDodging = true;
+                                urgencyLevel = 1;
+                            } else if (predictedY < futureTop - predictMargin) {
+                                shouldGoUp = false;
+                                needsDodging = true;
+                                urgencyLevel = 1;
+                            }
+                        }
+                    }
+
+                    // Execute movement with precision timing
+                    if (needsDodging) {
+                        const newDirection = shouldGoUp ? 'up' : 'down';
+                        const isEmergency = urgencyLevel >= 3;
+
+                        // Emergency override - ignore cooldown for critical situations
+                        if (this.currentWaveDirection !== newDirection &&
+                            (this.canWaveActionNow() || isEmergency)) {
+                            this.keys['Space'] = shouldGoUp;
+                            this.currentWaveDirection = newDirection;
+                            this.lastWaveAction = Date.now();
+                        }
+                        // Hold current direction
+                        else if (this.currentWaveDirection === 'up') {
+                            this.keys['Space'] = true;
+                        } else if (this.currentWaveDirection === 'down') {
+                            this.keys['Space'] = false;
+                        }
+                    } else {
+                        // Safe positioning with minimal adjustments
+                        const targetY = this.canvas.height * 0.55;
+                        const tolerance = 25; // Larger tolerance to reduce spam
+
+                        if (Math.abs(playerCenterY - targetY) > tolerance && this.canWaveActionNow()) {
+                            const newDirection = playerCenterY > targetY ? 'down' : 'up';
+                            if (this.currentWaveDirection !== newDirection) {
+                                this.keys['Space'] = playerCenterY < targetY;
+                                this.currentWaveDirection = newDirection;
+                                this.lastWaveAction = Date.now();
+                            }
+                        }
+                        // Maintain current direction if within tolerance
+                        else if (this.currentWaveDirection === 'up') {
+                            this.keys['Space'] = true;
+                        } else if (this.currentWaveDirection === 'down') {
+                            this.keys['Space'] = false;
+                        }
+                    }
+                    break;
+
+                case 'ship':
+                    // Enhanced ship navigation with look-ahead
+                    let shipNeedsDodging = false;
+                    let shipShouldGoUp = false;
+
+                    // Boundary avoidance
+                    if (playerCenterY < 70) {
+                        shipShouldGoUp = false;
+                        shipNeedsDodging = true;
+                    } else if (playerCenterY > this.canvas.height - 120) {
+                        shipShouldGoUp = true;
+                        shipNeedsDodging = true;
+                    }
+
+                    // Immediate obstacle handling
+                    if (!shipNeedsDodging && immediateObstacles.length > 0) {
+                        const shipObstacle = immediateObstacles[0].obstacle;
+                        const shipDistance = immediateObstacles[0].distance;
+                        const shipObstacleBottom = shipObstacle.y + shipObstacle.height;
+                        const shipObstacleTop = shipObstacle.y;
+                        const shipSafeMargin = 50;
+
+                        if (shipDistance < 120) {
+                            if (playerCenterY > shipObstacleBottom + shipSafeMargin) {
+                                shipShouldGoUp = true;
+                                shipNeedsDodging = true;
+                            } else if (playerCenterY < shipObstacleTop - shipSafeMargin) {
+                                shipShouldGoUp = false;
+                                shipNeedsDodging = true;
+                            } else {
+                                const topSpace = shipObstacleTop - 60;
+                                const bottomSpace = (this.canvas.height - 60) - shipObstacleBottom;
+                                if (Math.abs(topSpace - bottomSpace) > 40) {
+                                    shipShouldGoUp = topSpace > bottomSpace;
+                                    shipNeedsDodging = true;
+                                }
+                            }
+                        }
+                    }
+
+                    // Future planning for ship
+                    if (!shipNeedsDodging && futureObstacles.length > 0) {
+                        const futureShipObstacle = futureObstacles[0].obstacle;
+                        const futureShipDistance = futureObstacles[0].distance;
+
+                        if (futureShipDistance < 250) {
+                            const futureShipBottom = futureShipObstacle.y + futureShipObstacle.height;
+                            const futureShipTop = futureShipObstacle.y;
+
+                            // Predict trajectory and adjust early
+                            const shipTrajectory = this.player.shipVelocity;
+                            const timeToShipObstacle = futureShipDistance / this.speed;
+                            const predictedShipY = playerCenterY + (shipTrajectory * timeToShipObstacle);
+
+                            if (predictedShipY > futureShipBottom + 50) {
+                                shipShouldGoUp = true;
+                                shipNeedsDodging = true;
+                            } else if (predictedShipY < futureShipTop - 50) {
+                                shipShouldGoUp = false;
+                                shipNeedsDodging = true;
+                            }
+                        }
+                    }
+
+                    // Execute ship movement with precision
+                    if (shipNeedsDodging && this.canShipActionNow()) {
+                        this.keys['Space'] = shipShouldGoUp;
+                        this.lastShipAction = Date.now();
+                    } else if (!shipNeedsDodging) {
+                        // Maintain safe center position with reduced sensitivity
+                        const shipTargetY = this.canvas.height * 0.6;
+                        const shipTolerance = 30;
+
+                        if (Math.abs(playerCenterY - shipTargetY) > shipTolerance && this.canShipActionNow()) {
+                            this.keys['Space'] = playerCenterY > shipTargetY;
+                            this.lastShipAction = Date.now();
+                        }
+                    }
+                    break;
+            }
+        } else {
+            // No immediate obstacles - maintain safe positioning
+            switch (mode) {
+                case 'cube':
+                    // Stay on ground when safe
+                    if (!this.player.onGround && this.player.y > this.canvas.height - 150) {
+                        // Don't jump unnecessarily
+                    }
+                    break;
+
+                case 'wave':
+                    // Safe positioning when no obstacles - minimal adjustments
+                    const waveTargetY = this.canvas.height * 0.55;
+                    const waveTolerance = 30;
+
+                    if (Math.abs(playerCenterY - waveTargetY) > waveTolerance && this.canWaveActionNow()) {
+                        const newWaveDirection = playerCenterY > waveTargetY ? 'down' : 'up';
+                        if (this.currentWaveDirection !== newWaveDirection) {
+                            this.keys['Space'] = playerCenterY < waveTargetY;
+                            this.currentWaveDirection = newWaveDirection;
+                            this.lastWaveAction = Date.now();
+                        }
+                    }
+                    break;
+
+                case 'ship':
+                    // Stay in middle-lower area when safe with precision
+                    const shipTargetY = this.canvas.height * 0.6;
+                    const shipSafeTolerance = 35;
+
+                    if (Math.abs(playerCenterY - shipTargetY) > shipSafeTolerance && this.canShipActionNow()) {
+                        this.keys['Space'] = playerCenterY > shipTargetY;
+                        this.lastShipAction = Date.now();
+                    }
+                    break;
+            }
+        }
+    }
+
+    // Precision timing functions to prevent spam
+    canJumpNow() {
+        const jumpCooldown = 150; // 150ms between jumps - more responsive but still controlled
+        return Date.now() - this.lastJumpTime > jumpCooldown;
+    }
+
+    canWaveActionNow() {
+        const waveActionCooldown = 50; // 50ms between wave direction changes - more responsive
+        return Date.now() - this.lastWaveAction > waveActionCooldown;
+    }
+
+    canShipActionNow() {
+        const shipActionCooldown = 150; // 150ms between ship direction changes
+        return Date.now() - this.lastShipAction > shipActionCooldown;
+    }
+
     gameOver() {
+        if (this.autoPlay) {
+            // Auto-restart if auto-play is enabled
+            setTimeout(() => {
+                this.restartGame();
+            }, 500);
+            return;
+        }
+
         this.gameState = 'gameOver';
 
         // Set game over content for death
