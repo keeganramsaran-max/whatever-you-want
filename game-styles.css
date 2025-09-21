@@ -131,6 +131,22 @@ body {
     box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
 }
 
+/* Keep restart and next level buttons red */
+#restartLevelBtn,
+#nextLevelBtn,
+#playAgainBtn {
+    background: linear-gradient(45deg, #ff4444, #ff6666) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3) !important;
+}
+
+#restartLevelBtn:hover,
+#nextLevelBtn:hover,
+#playAgainBtn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4) !important;
+}
+
 .game-controls {
     display: flex;
     gap: 20px;
@@ -184,10 +200,10 @@ body {
     background: linear-gradient(45deg, #00ff88, #00cc6a);
     color: #1a1a2e;
     border: none;
-    padding: 12px 25px;
-    font-size: 1.1rem;
+    padding: 15px 30px;
+    font-size: 1.2rem;
     font-weight: bold;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
@@ -202,6 +218,12 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
+}
+
+#editorBtn {
+    background: #000000;
+    border: 2px solid #00ff88;
+    color: #00ff88;
 }
 
 .volume-control {

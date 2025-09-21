@@ -40,19 +40,21 @@ body {
 }
 
 .editor-controls button {
-    background: linear-gradient(45deg, #00ff88, #00cc6a);
-    color: #1a1a2e;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 5px;
+    background: #000000;
+    color: #00ff88;
+    border: 2px solid #00ff88;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    border-radius: 10px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
 }
 
 .editor-controls button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);
 }
 
 .editor-main {
@@ -85,67 +87,35 @@ body {
 .portal-btn,
 .speed-btn {
     width: 100%;
-    padding: 8px 12px;
+    padding: 15px 30px;
     margin-bottom: 8px;
-    background: rgba(0, 255, 136, 0.2);
+    background: #000000;
     color: #00ff88;
-    border: 1px solid #00ff88;
-    border-radius: 5px;
+    border: 2px solid #00ff88;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 0.9rem;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
 }
 
 .tool-btn:hover,
 .obstacle-btn:hover,
 .portal-btn:hover,
 .speed-btn:hover {
-    background: rgba(0, 255, 136, 0.3);
-    transform: translateX(5px);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);
 }
 
 .tool-btn.active {
     background: #00ff88;
-    color: #1a1a2e;
+    color: #000000;
+    border: 2px solid #00ff88;
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.6);
+    transform: translateY(-2px);
 }
 
-.obstacle-btn[data-type="spike"] {
-    border-color: #ff4444;
-    color: #ff4444;
-}
-
-.obstacle-btn[data-type="platform"] {
-    border-color: #4CAF50;
-    color: #4CAF50;
-}
-
-.portal-btn[data-mode="cube"] {
-    border-color: #00ff88;
-    color: #00ff88;
-}
-
-.portal-btn[data-mode="wave"] {
-    border-color: #2196F3;
-    color: #2196F3;
-}
-
-.portal-btn[data-mode="ship"] {
-    border-color: #FF9800;
-    color: #FF9800;
-}
-
-.portal-btn[data-mode="ball"] {
-    border-color: #9C27B0;
-    color: #9C27B0;
-}
-
-.speed-btn[data-speed="0.5"] { color: #4CAF50; }
-.speed-btn[data-speed="0.75"] { color: #8BC34A; }
-.speed-btn[data-speed="1.0"] { color: #00ff88; }
-.speed-btn[data-speed="1.5"] { color: #FFC107; }
-.speed-btn[data-speed="2.0"] { color: #FF9800; }
-.speed-btn[data-speed="3.0"] { color: #F44336; }
-.speed-btn[data-speed="4.0"] { color: #9C27B0; }
+/* All buttons now use consistent styling - no individual color overrides */
 
 .tool-section label {
     display: block;
@@ -186,17 +156,20 @@ body {
 }
 
 .viewport-controls button {
-    background: rgba(0, 255, 136, 0.2);
+    background: #000000;
     color: #00ff88;
-    border: 1px solid #00ff88;
-    padding: 5px 10px;
-    border-radius: 3px;
+    border: 2px solid #00ff88;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
 }
 
 .viewport-controls button:hover {
-    background: rgba(0, 255, 136, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);
 }
 
 #zoomLevel {
@@ -333,19 +306,21 @@ body {
 }
 
 .modal-buttons button {
-    background: linear-gradient(45deg, #00ff88, #00cc6a);
-    color: #1a1a2e;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
+    background: #000000;
+    color: #00ff88;
+    border: 2px solid #00ff88;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    border-radius: 10px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
 }
 
 .modal-buttons button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);
 }
 
 #modalCancel {

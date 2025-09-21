@@ -1518,7 +1518,7 @@ class GeometryDash {
             };
 
             if (this.checkHitboxCollision(playerHitbox, portalHitbox)) {
-                this.speedMultiplier = portal.speedMultiplier;
+                this.speedMultiplier = portal.speed;
                 this.speed = this.baseSpeed * this.speedMultiplier;
 
                 this.playSound('jump');
