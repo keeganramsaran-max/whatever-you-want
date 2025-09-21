@@ -395,6 +395,17 @@ class LevelEditor {
                 return;
             }
         }
+
+        // Check finish portals
+        for (let i = this.finishPortals.length - 1; i >= 0; i--) {
+            const obj = this.finishPortals[i];
+            if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
+                this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
+                this.finishPortals.splice(i, 1);
+                this.updateStats();
+                return;
+            }
+        }
     }
 
     deleteSelectedObject() {
@@ -412,6 +423,11 @@ class LevelEditor {
                 index = [].indexOf(this.selectedObject);
                 if (index !== -1) {
                     [].splice(index, 1);
+                } else {
+                    index = this.finishPortals.indexOf(this.selectedObject);
+                    if (index !== -1) {
+                        this.finishPortals.splice(index, 1);
+                    }
                 }
             }
         }
@@ -464,13 +480,14 @@ class LevelEditor {
             this.drawGrid();
         }
 
-        // Draw ground (aligned to grid)
-        const groundY = this.canvas.height / this.zoom - 50 + this.camera.y;
-        const alignedGroundY = this.gridSnap ? Math.round(groundY / this.gridSize) * this.gridSize : groundY;
+        // Draw ground - exactly match game's ground level
+        // Account for the canvas transforms: scale and translate are applied
+        // Game ground is at canvas.height - 50, but we need to position it in world space
+        const gameGroundY = (this.canvas.height - 50) / this.zoom + this.camera.y;
 
         this.ctx.fillStyle = '#333';
-        this.ctx.fillRect(0, alignedGroundY,
-                         this.canvas.width / this.zoom + this.camera.x, 50);
+        this.ctx.fillRect(this.camera.x, gameGroundY,
+                         this.canvas.width / this.zoom, 50 / this.zoom);
 
         // Draw objects
         this.drawObjects();
@@ -495,9 +512,10 @@ class LevelEditor {
         this.ctx.strokeStyle = 'rgba(0, 255, 136, 0.2)';
         this.ctx.lineWidth = 1;
 
-        // Calculate ground position for proper alignment
-        const groundY = this.canvas.height / this.zoom - 50 + this.camera.y;
-        const baselineY = Math.floor(groundY / this.gridSize) * this.gridSize;
+        // Calculate ground position for proper alignment - exactly match game
+        // Account for the canvas transforms: scale and translate are applied
+        const gameGroundY = (this.canvas.height - 50) / this.zoom + this.camera.y;
+        const baselineY = Math.floor(gameGroundY / this.gridSize) * this.gridSize;
 
         const startX = Math.floor(this.camera.x / this.gridSize) * this.gridSize;
         const endX = this.camera.x + this.canvas.width / this.zoom;

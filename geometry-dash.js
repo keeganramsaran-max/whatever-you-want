@@ -2,8 +2,7 @@ class GeometryDash {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = 800;
-        this.canvas.height = 400;
+        this.setupCanvas();
 
         this.gameState = 'menu';
         this.gameMode = 'mixed';
@@ -29,19 +28,19 @@ class GeometryDash {
             width: 30,
             height: 30,
             velocity: 0,
-            jumpPower: 11.25,
-            gravity: 0.6,
+            jumpPower: 11.25 / 1.25 / 1.25,
+            gravity: 0.6 / 1.25 / 1.25,
             onGround: false,
             color: '#00ff88',
             trail: [],
             persistentWaveTrail: [],
             waveVelocity: 0,
             waveHorizontalVelocity: 0,
-            waveSpeed: 5.625,
+            waveSpeed: 5.625 / 1.25 / 1.25,
             shipVelocity: 0,
-            shipSpeed: 6,
+            shipSpeed: 5.625 / 1.25 / 1.25,
             ballVelocity: 0,
-            ballSpeed: 6,
+            ballSpeed: 5.625 / 1.25 / 1.25,
             rotation: 0,
             gravityDirection: 1,
             canChangeGravity: true
@@ -59,9 +58,10 @@ class GeometryDash {
         this.speedPortals = [];
         this.finishPortals = [];
         this.camera = { x: 0 };
-        this.baseSpeed = 7.03125;
-        this.speed = 7.03125;
+        this.baseSpeed = 7.03125 / 1.25 / 1.25 / 1.5;
+        this.speed = 7.03125 / 1.25 / 1.25 / 1.5;
         this.speedMultiplier = 1;
+        this.gameSpeedMultiplier = 1;
         this.lastObstacle = 0;
         this.showHitboxes = false;
         this.autoPlay = false;
@@ -169,6 +169,9 @@ class GeometryDash {
             if ((e.code === 'Space' || e.code === 'ArrowUp') && this.gameState === 'playing') {
                 e.preventDefault();
                 this.jump();
+            } else if (e.code === 'Space' && this.gameState === 'gameOver') {
+                e.preventDefault();
+                this.restartGame();
             }
         });
 
@@ -185,6 +188,24 @@ class GeometryDash {
 
         this.canvas.addEventListener('mouseup', () => {
             this.mousePressed = false;
+        });
+
+        // Touch controls for mobile
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.mousePressed = true;
+            if (this.gameState === 'playing') {
+                this.jump();
+            }
+        });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.mousePressed = false;
+        });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
         });
 
         document.getElementById('startBtn').addEventListener('click', () => {
@@ -215,6 +236,11 @@ class GeometryDash {
 
         document.getElementById('volume').addEventListener('input', (e) => {
             this.volumeLevel = e.target.value / 100;
+        });
+
+        document.getElementById('gameSpeed').addEventListener('input', (e) => {
+            this.gameSpeedMultiplier = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = e.target.value + 'x';
         });
 
         document.getElementById('gameMode').addEventListener('change', (e) => {
@@ -329,7 +355,7 @@ class GeometryDash {
         this.player.y += this.player.waveVelocity;
 
         // Apply horizontal movement - wave always moves forward like slopes
-        this.player.x += this.player.waveHorizontalVelocity;
+        this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -954,7 +980,9 @@ class GeometryDash {
     }
 
     generateSectionObstacles(startX, endX, mode) {
-        for (let x = startX; x < endX; x += 150 + Math.random() * 50) { // More consistent spacing: 150-200px apart
+        // Add more space after portals for cube sections
+        const firstObstacleX = mode === 'cube' ? startX + 200 : startX;
+        for (let x = firstObstacleX; x < endX; x += 150 + Math.random() * 50) { // More consistent spacing: 150-200px apart
             const type = Math.random();
 
             if (mode === 'cube') {
@@ -2196,7 +2224,7 @@ class GeometryDash {
 
         // For wave mode, horizontal movement is handled in handleWaveMovement
         if (mode !== 'wave') {
-            this.player.x += this.speed;
+            this.player.x += this.speed * this.gameSpeedMultiplier;
         }
         this.score = Math.floor(this.player.x / 10);
 
@@ -2783,6 +2811,30 @@ class GeometryDash {
         }
     }
 
+    setupCanvas() {
+        // Set canvas size based on screen size
+        const container = this.canvas.parentElement;
+        const maxWidth = Math.min(800, window.innerWidth * 0.9);
+        const maxHeight = Math.min(400, window.innerHeight * 0.4);
+
+        // Maintain aspect ratio
+        const aspectRatio = 800 / 400;
+        let canvasWidth = maxWidth;
+        let canvasHeight = maxWidth / aspectRatio;
+
+        if (canvasHeight > maxHeight) {
+            canvasHeight = maxHeight;
+            canvasWidth = maxHeight * aspectRatio;
+        }
+
+        this.canvas.width = canvasWidth;
+        this.canvas.height = canvasHeight;
+
+        // Set CSS size to match canvas size
+        this.canvas.style.width = canvasWidth + 'px';
+        this.canvas.style.height = canvasHeight + 'px';
+    }
+
     restartGame() {
         this.attempts++;
         document.getElementById('attempts').textContent = this.attempts;
@@ -2818,5 +2870,17 @@ class GeometryDash {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new GeometryDash();
+    const game = new GeometryDash();
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        game.setupCanvas();
+    });
+
+    // Handle orientation change on mobile
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            game.setupCanvas();
+        }, 100);
+    });
 });
