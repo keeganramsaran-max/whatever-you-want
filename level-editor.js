@@ -8,6 +8,8 @@ class LevelEditor {
         this.selectedObject = null;
         this.objects = [];
         this.portals = [];
+        this.speedPortals = [];
+        this.finishPortals = [];
 
         // View state
         this.camera = { x: 0, y: 0 };
@@ -44,7 +46,7 @@ class LevelEditor {
                 this.selectedObject = null;
 
                 // Clear other button states when switching tools
-                document.querySelectorAll('.portal-btn, , .obstacle-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.portal-btn, .obstacle-btn, .speed-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
@@ -62,7 +64,7 @@ class LevelEditor {
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
                 // Clear other button states
-                document.querySelectorAll('.portal-btn, ').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.portal-btn, .speed-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
@@ -74,28 +76,34 @@ class LevelEditor {
                 // Add active state to clicked button
                 e.target.classList.add('active');
 
-                this.currentGameMode = e.target.dataset.mode;
+                // Check if it's a finish portal
+                if (e.target.dataset.type === 'finish') {
+                    this.currentObjectType = 'finishPortal';
+                } else {
+                    this.currentGameMode = e.target.dataset.mode;
+                    this.currentObjectType = 'portal';
+                }
+
                 this.currentTool = 'place';
-                this.currentObjectType = 'portal';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
                 // Clear other button states
-                document.querySelectorAll('.obstacle-btn, ').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.obstacle-btn, .speed-btn').forEach(b => b.classList.remove('active'));
             });
         });
 
         // Speed portal selection
-        document.querySelectorAll('').forEach(btn => {
+        document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 // Remove active state from all speed buttons
-                document.querySelectorAll('').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
                 // Add active state to clicked button
                 e.target.classList.add('active');
 
                 this.currentSpeed = parseFloat(e.target.dataset.speed);
                 this.currentTool = 'place';
-                this.currentObjectType = '';
+                this.currentObjectType = 'speedPortal';
                 document.querySelector('.tool-btn.active').classList.remove('active');
                 document.querySelector('[data-tool="place"]').classList.add('active');
 
@@ -325,9 +333,15 @@ class LevelEditor {
             newObject.height = this.canvas.height - 50; // Full height minus ground
             newObject.y = 0; // Start from top
             this.portals.push(newObject);
-        } else if (this.currentObjectType === '') {
+        } else if (this.currentObjectType === 'speedPortal') {
             newObject.speed = this.currentSpeed;
-            [].push(newObject);
+            this.speedPortals.push(newObject);
+        } else if (this.currentObjectType === 'finishPortal') {
+            // Make finish portals span the full height and wider like regular portals
+            newObject.width = 60; // Make wider
+            newObject.height = this.canvas.height - 50; // Full height minus ground
+            newObject.y = 0; // Start from top
+            this.finishPortals.push(newObject);
         } else {
             this.objects.push(newObject);
         }
@@ -339,7 +353,7 @@ class LevelEditor {
         this.selectedObject = null;
 
         // Check objects
-        for (let obj of [...this.objects, ...this.portals, ...[]]) {
+        for (let obj of [...this.objects, ...this.portals, ...this.speedPortals, ...this.finishPortals]) {
             if (this.mouse.x >= obj.x && this.mouse.x <= obj.x + obj.width &&
                 this.mouse.y >= obj.y && this.mouse.y <= obj.y + obj.height) {
                 this.selectedObject = obj;
@@ -462,6 +476,7 @@ class LevelEditor {
         this.drawObjects();
         this.drawPortals();
         this.drawSpeedPortals();
+        this.drawFinishPortals();
 
         // Draw preview object
         if (this.currentTool === 'place') {
@@ -632,7 +647,7 @@ class LevelEditor {
     }
 
     drawSpeedPortals() {
-        [].forEach(portal => {
+        this.speedPortals.forEach(portal => {
             this.ctx.fillStyle = this.getSpeedColor(portal.speed);
 
             if (portal.rotation && portal.rotation !== 0) {
@@ -660,6 +675,35 @@ class LevelEditor {
         });
     }
 
+    drawFinishPortals() {
+        this.finishPortals.forEach(portal => {
+            this.ctx.fillStyle = '#FFD700'; // Gold color for finish portal
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
+            this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
+
+            // Draw finish text
+            this.ctx.fillStyle = 'black';
+            this.ctx.font = '14px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('FINISH',
+                            portal.x + portal.width/2,
+                            portal.y + portal.height/2 + 4);
+
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
+        });
+    }
+
     drawPreview() {
         this.ctx.globalAlpha = 0.5;
 
@@ -675,9 +719,11 @@ class LevelEditor {
         if (this.currentObjectType === 'portal') {
             previewObj.mode = this.currentGameMode;
             this.ctx.fillStyle = this.getPortalColor(this.currentGameMode);
-        } else if (this.currentObjectType === '') {
+        } else if (this.currentObjectType === 'speedPortal') {
             previewObj.speed = this.currentSpeed;
             this.ctx.fillStyle = this.getSpeedColor(this.currentSpeed);
+        } else if (this.currentObjectType === 'finishPortal') {
+            this.ctx.fillStyle = '#FFD700'; // Gold color for finish portal
         } else {
             this.ctx.fillStyle = this.getObjectColor(this.currentObjectType);
         }
@@ -834,7 +880,8 @@ class LevelEditor {
             difficulty: parseInt(document.getElementById('levelDifficulty').value),
             objects: this.objects,
             portals: this.portals,
-            speedPortals: [],
+            speedPortals: this.speedPortals,
+            finishPortals: this.finishPortals,
             created: new Date().toISOString()
         };
 
@@ -846,7 +893,8 @@ class LevelEditor {
 
         this.objects = levelData.objects || [];
         this.portals = levelData.portals || [];
-        [] = levelData.speedPortals || [];
+        this.speedPortals = levelData.speedPortals || [];
+        this.finishPortals = levelData.finishPortals || [];
 
         document.getElementById('levelName').value = levelData.name || 'Custom Level';
         document.getElementById('levelDifficulty').value = levelData.difficulty || 1;

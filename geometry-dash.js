@@ -29,17 +29,17 @@ class GeometryDash {
             width: 30,
             height: 30,
             velocity: 0,
-            jumpPower: 11,
-            gravity: 0.4,
+            jumpPower: 11.25,
+            gravity: 0.6,
             onGround: false,
             color: '#00ff88',
             trail: [],
             persistentWaveTrail: [],
             waveVelocity: 0,
             waveHorizontalVelocity: 0,
-            waveSpeed: 3,
+            waveSpeed: 5.625,
             shipVelocity: 0,
-            shipSpeed: 4,
+            shipSpeed: 6,
             ballVelocity: 0,
             ballSpeed: 6,
             rotation: 0,
@@ -56,9 +56,11 @@ class GeometryDash {
         this.obstacles = [];
         this.particles = [];
         this.portals = [];
+        this.speedPortals = [];
+        this.finishPortals = [];
         this.camera = { x: 0 };
-        this.baseSpeed = 3.75;
-        this.speed = 3.75;
+        this.baseSpeed = 7.03125;
+        this.speed = 7.03125;
         this.speedMultiplier = 1;
         this.lastObstacle = 0;
         this.showHitboxes = false;
@@ -66,6 +68,8 @@ class GeometryDash {
         this.autoPlayClickTimer = 0;
         this.autoPlayClickInterval = 3;
         this.lastJumpTime = 0;
+        this.jumpSpamTimer = 0;
+        this.jumpSpamInterval = 100; // 100ms between spam jumps
         this.lastWaveAction = 0;
         this.lastShipAction = 0;
         this.currentWaveDirection = null; // 'up', 'down', or null
@@ -459,6 +463,8 @@ class GeometryDash {
     generateLevel() {
         this.obstacles = [];
         this.portals = [];
+        this.speedPortals = [];
+        this.finishPortals = [];
         this.speed = this.baseSpeed;
         this.speedMultiplier = 1;
 
@@ -519,7 +525,7 @@ class GeometryDash {
         }));
 
         // Load speed portals
-        [] = this.customLevelData.speedPortals.map(portal => ({
+        this.speedPortals = this.customLevelData.speedPortals ? this.customLevelData.speedPortals.map(portal => ({
             x: portal.x,
             y: portal.y,
             width: portal.width,
@@ -527,7 +533,16 @@ class GeometryDash {
             speed: portal.speed,
             color: this.getSpeedPortalColor(portal.speed),
             rotation: portal.rotation || 0
-        }));
+        })) : [];
+
+        // Load finish portals
+        this.finishPortals = this.customLevelData.finishPortals ? this.customLevelData.finishPortals.map(portal => ({
+            x: portal.x,
+            y: portal.y,
+            width: portal.width,
+            height: portal.height,
+            rotation: portal.rotation || 0
+        })) : [];
     }
 
     getSpeedPortalColor(speed) {
@@ -1931,7 +1946,7 @@ class GeometryDash {
         this.ctx.save();
         this.ctx.translate(-this.camera.x, 0);
 
-        for (let portal of []) {
+        for (let portal of this.speedPortals || []) {
             if (portal.used) continue;
 
             if (portal.x + portal.width < this.camera.x - 100 ||
@@ -1981,12 +1996,80 @@ class GeometryDash {
         this.ctx.restore();
     }
 
+    drawFinishPortals() {
+        this.ctx.save();
+        this.ctx.translate(-this.camera.x, 0);
+
+        for (let portal of this.finishPortals || []) {
+            if (portal.x + portal.width < this.camera.x - 100 ||
+                portal.x > this.camera.x + this.canvas.width + 100) {
+                continue;
+            }
+
+            // Handle rotation if present
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.save();
+                const centerX = portal.x + portal.width / 2;
+                const centerY = portal.y + portal.height / 2;
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate((portal.rotation * Math.PI) / 180);
+                this.ctx.translate(-centerX, -centerY);
+            }
+
+            // Draw finish portal with gold color
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.globalAlpha = 0.8;
+            this.ctx.fillRect(portal.x, portal.y, portal.width, portal.height);
+
+            this.ctx.strokeStyle = '#FFA500';
+            this.ctx.lineWidth = 3;
+            this.ctx.globalAlpha = 1;
+            this.ctx.strokeRect(portal.x, portal.y, portal.width, portal.height);
+
+            // Draw finish text
+            this.ctx.fillStyle = 'black';
+            this.ctx.font = '16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('FINISH',
+                portal.x + portal.width/2,
+                portal.y + portal.height/2 + 4
+            );
+
+            // Restore rotation if applied
+            if (portal.rotation && portal.rotation !== 0) {
+                this.ctx.restore();
+            }
+
+            // Add glow effect
+            const time = Date.now() * 0.003;
+            this.ctx.globalAlpha = 0.2 + Math.sin(time + portal.x * 0.01) * 0.2;
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.fillRect(portal.x - 3, portal.y - 3, portal.width + 6, portal.height + 6);
+        }
+
+        this.ctx.restore();
+    }
 
     checkLevelCompletion() {
-        const levelLength = this.getLevelLength();
+        // For custom levels with finish portals, check for finish portal collision
+        if (this.isCustomLevel && this.finishPortals && this.finishPortals.length > 0) {
+            const playerHitbox = this.getPlayerHitbox();
 
-        if (this.player.x >= levelLength) {
-            this.levelComplete();
+            for (let portal of this.finishPortals) {
+                if (playerHitbox.x < portal.x + portal.width &&
+                    playerHitbox.x + playerHitbox.width > portal.x &&
+                    playerHitbox.y < portal.y + portal.height &&
+                    playerHitbox.y + playerHitbox.height > portal.y) {
+                    this.levelComplete();
+                    return;
+                }
+            }
+        } else {
+            // For regular levels or custom levels without finish portals, use distance
+            const levelLength = this.getLevelLength();
+            if (this.player.x >= levelLength) {
+                this.levelComplete();
+            }
         }
     }
 
@@ -2099,8 +2182,19 @@ class GeometryDash {
     update() {
         if (this.gameState !== 'playing') return;
 
-        // For wave mode, horizontal movement is handled in handleWaveMovement
+        // Handle continuous jumping for cube mode when holding space or mouse
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+        if (mode === 'cube') {
+            const currentTime = Date.now();
+            const isJumpKeyPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
+
+            if (isJumpKeyPressed && currentTime - this.jumpSpamTimer > this.jumpSpamInterval) {
+                this.jump();
+                this.jumpSpamTimer = currentTime;
+            }
+        }
+
+        // For wave mode, horizontal movement is handled in handleWaveMovement
         if (mode !== 'wave') {
             this.player.x += this.speed;
         }
@@ -2232,6 +2326,7 @@ class GeometryDash {
         this.drawObstacles();
         this.drawPortals();
         this.drawSpeedPortals();
+        this.drawFinishPortals();
         this.drawParticles();
         this.drawPlayer();
 
@@ -2470,30 +2565,32 @@ class GeometryDash {
                             this.currentWaveDirection = newDirection;
                             this.lastWaveAction = Date.now();
                         }
-                        // Hold current direction
-                        else if (this.currentWaveDirection === 'up') {
-                            this.keys['Space'] = true;
-                        } else if (this.currentWaveDirection === 'down') {
-                            this.keys['Space'] = false;
+                        // Only maintain direction during dodging if we're not changing direction
+                        else if (this.currentWaveDirection === newDirection) {
+                            this.keys['Space'] = shouldGoUp;
                         }
                     } else {
-                        // Safe positioning with minimal adjustments
-                        const targetY = this.canvas.height * 0.55;
-                        const tolerance = 25; // Larger tolerance to reduce spam
+                        // Safe positioning - only act when really necessary
+                        const targetY = this.canvas.height * 0.5;
+                        const tolerance = 60; // Large tolerance to minimize actions
 
+                        // Only act if we're far from center AND it's been a while since last action
                         if (Math.abs(playerCenterY - targetY) > tolerance && this.canWaveActionNow()) {
-                            const newDirection = playerCenterY > targetY ? 'down' : 'up';
+                            const shouldGoUp = playerCenterY > targetY;
+                            const newDirection = shouldGoUp ? 'up' : 'down';
+
+                            // Only change if we need a different direction
                             if (this.currentWaveDirection !== newDirection) {
-                                this.keys['Space'] = playerCenterY < targetY;
+                                this.keys['Space'] = shouldGoUp;
                                 this.currentWaveDirection = newDirection;
                                 this.lastWaveAction = Date.now();
                             }
-                        }
-                        // Maintain current direction if within tolerance
-                        else if (this.currentWaveDirection === 'up') {
-                            this.keys['Space'] = true;
-                        } else if (this.currentWaveDirection === 'down') {
-                            this.keys['Space'] = false;
+                        } else {
+                            // Clear any held inputs when no action is needed
+                            if (this.keys['Space'] !== undefined) {
+                                delete this.keys['Space'];
+                            }
+                            this.currentWaveDirection = null;
                         }
                     }
                     break;
@@ -2569,11 +2666,16 @@ class GeometryDash {
                     } else if (!shipNeedsDodging) {
                         // Maintain safe center position with reduced sensitivity
                         const shipTargetY = this.canvas.height * 0.6;
-                        const shipTolerance = 30;
+                        const shipTolerance = 40; // Increased tolerance
 
                         if (Math.abs(playerCenterY - shipTargetY) > shipTolerance && this.canShipActionNow()) {
                             this.keys['Space'] = playerCenterY > shipTargetY;
                             this.lastShipAction = Date.now();
+                        } else if (Math.abs(playerCenterY - shipTargetY) <= shipTolerance) {
+                            // Clear input when in safe zone
+                            if (this.keys['Space'] !== undefined) {
+                                delete this.keys['Space'];
+                            }
                         }
                     }
                     break;
@@ -2589,17 +2691,24 @@ class GeometryDash {
                     break;
 
                 case 'wave':
-                    // Safe positioning when no obstacles - minimal adjustments
-                    const waveTargetY = this.canvas.height * 0.55;
-                    const waveTolerance = 30;
+                    // Safe positioning when no obstacles - very minimal adjustments
+                    const waveTargetY = this.canvas.height * 0.5;
+                    const waveTolerance = 80; // Much larger tolerance when safe
 
                     if (Math.abs(playerCenterY - waveTargetY) > waveTolerance && this.canWaveActionNow()) {
-                        const newWaveDirection = playerCenterY > waveTargetY ? 'down' : 'up';
+                        const shouldGoUp = playerCenterY > waveTargetY;
+                        const newWaveDirection = shouldGoUp ? 'up' : 'down';
                         if (this.currentWaveDirection !== newWaveDirection) {
-                            this.keys['Space'] = playerCenterY < waveTargetY;
+                            this.keys['Space'] = shouldGoUp;
                             this.currentWaveDirection = newWaveDirection;
                             this.lastWaveAction = Date.now();
                         }
+                    } else if (Math.abs(playerCenterY - waveTargetY) <= waveTolerance) {
+                        // Clear input when in very safe zone
+                        if (this.keys['Space'] !== undefined) {
+                            delete this.keys['Space'];
+                        }
+                        this.currentWaveDirection = null;
                     }
                     break;
 
@@ -2624,7 +2733,7 @@ class GeometryDash {
     }
 
     canWaveActionNow() {
-        const waveActionCooldown = 50; // 50ms between wave direction changes - more responsive
+        const waveActionCooldown = 150; // 150ms between wave direction changes - prevent spam
         return Date.now() - this.lastWaveAction > waveActionCooldown;
     }
 
