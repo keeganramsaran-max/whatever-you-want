@@ -29,16 +29,16 @@ class GeometryDash {
             height: 30,
             velocity: 0,
             jumpPower: 11.25,
-            gravity: 0.6 / 1.25 / 1.25,
+            gravity: 0.6,
             onGround: false,
             color: '#00ff88',
             trail: [],
             persistentWaveTrail: [],
             waveVelocity: 0,
             waveHorizontalVelocity: 0,
-            waveSpeed: 5.625 / 1.25 / 1.25,
+            waveSpeed: 3.75,
             shipVelocity: 0,
-            shipSpeed: 5.625 / 1.25 / 1.25,
+            shipSpeed: 3.75,
             ballVelocity: 0,
             ballSpeed: 5.625 / 1.25 / 1.25,
             rotation: 0,
@@ -319,7 +319,7 @@ class GeometryDash {
         }
 
         if (this.player.onGround || this.player.y >= this.canvas.height - this.player.height - 50) {
-            this.player.velocity = -this.player.jumpPower * this.speedMultiplier;
+            this.player.velocity = -this.player.jumpPower;
             this.player.onGround = false;
             this.playSound('jump');
 
@@ -344,7 +344,7 @@ class GeometryDash {
 
         // Calculate 45-degree movement components - diagonal movement
         // Wave should move diagonally at constant speed, not add to base speed
-        const totalSpeed = this.player.waveSpeed * this.speedMultiplier * 1.5;
+        const totalSpeed = this.player.waveSpeed * 1.5;
         const diagonalVertical = totalSpeed * 0.707; // sin(45°) = 0.707
         const diagonalHorizontal = totalSpeed * 0.707; // cos(45°) = 0.707
 
@@ -387,9 +387,9 @@ class GeometryDash {
         if (mode !== 'ship') return;
 
         const isPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
-        const acceleration = 0.8 * this.speedMultiplier;
-        const deceleration = 0.6 * this.speedMultiplier;
-        const maxSpeed = this.player.shipSpeed * this.speedMultiplier;
+        const acceleration = 0.8;
+        const deceleration = 0.6;
+        const maxSpeed = this.player.shipSpeed;
 
         if (isPressed) {
             this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration, -maxSpeed);
