@@ -2812,10 +2812,25 @@ class GeometryDash {
     }
 
     setupCanvas() {
-        // Set canvas size based on screen size
-        const container = this.canvas.parentElement;
-        const maxWidth = Math.min(800, window.innerWidth * 0.9);
-        const maxHeight = Math.min(400, window.innerHeight * 0.4);
+        // Set canvas size based on screen size - more aggressive mobile sizing
+        const isMobile = window.innerWidth <= 768;
+        const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+
+        let maxWidth, maxHeight;
+
+        if (isMobile) {
+            // Mobile: use almost full screen width and more height
+            maxWidth = Math.min(800, window.innerWidth * 0.98);
+            maxHeight = Math.min(400, window.innerHeight * 0.6); // Increased from 0.4 to 0.6
+        } else if (isTablet) {
+            // Tablet: moderate sizing
+            maxWidth = Math.min(800, window.innerWidth * 0.9);
+            maxHeight = Math.min(400, window.innerHeight * 0.5);
+        } else {
+            // Desktop: keep original sizing
+            maxWidth = 800;
+            maxHeight = 400;
+        }
 
         // Maintain aspect ratio
         const aspectRatio = 800 / 400;
