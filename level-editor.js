@@ -480,13 +480,14 @@ class LevelEditor {
             this.drawGrid();
         }
 
-        // Draw ground - exactly match game's ground level
+        // Draw ground - align to grid for consistent snapping
         // Account for the canvas transforms: scale and translate are applied
         // Game ground is at canvas.height - 50, but we need to position it in world space
         const gameGroundY = (this.canvas.height - 50) / this.zoom + this.camera.y;
+        const gridAlignedGroundY = Math.round(gameGroundY / this.gridSize) * this.gridSize;
 
         this.ctx.fillStyle = '#333';
-        this.ctx.fillRect(this.camera.x, gameGroundY,
+        this.ctx.fillRect(this.camera.x, gridAlignedGroundY,
                          this.canvas.width / this.zoom, 50 / this.zoom);
 
         // Draw objects
@@ -515,7 +516,10 @@ class LevelEditor {
         // Calculate ground position for proper alignment - exactly match game
         // Account for the canvas transforms: scale and translate are applied
         const gameGroundY = (this.canvas.height - 50) / this.zoom + this.camera.y;
-        const baselineY = Math.floor(gameGroundY / this.gridSize) * this.gridSize;
+
+        // Snap the baseline to the nearest grid line for proper alignment
+        // This ensures both the visual grid and snapping work together
+        const baselineY = Math.round(gameGroundY / this.gridSize) * this.gridSize;
 
         const startX = Math.floor(this.camera.x / this.gridSize) * this.gridSize;
         const endX = this.camera.x + this.canvas.width / this.zoom;
@@ -530,7 +534,7 @@ class LevelEditor {
             this.ctx.stroke();
         }
 
-        // Draw horizontal grid lines aligned to ground
+        // Draw horizontal grid lines aligned to ground baseline
         for (let y = baselineY; y >= startY; y -= this.gridSize) {
             this.ctx.beginPath();
             this.ctx.moveTo(this.camera.x, y);
