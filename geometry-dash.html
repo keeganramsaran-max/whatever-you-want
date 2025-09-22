@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Geometry Dash</title>
     <link rel="stylesheet" href="game-styles.css">
 </head>
@@ -22,7 +22,7 @@
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div class="game-ui">
                 <div class="instructions" id="instructions">
-                    <p id="instructionText">Press SPACE/UP ARROW or click to jump!</p>
+                    <p id="instructionText">Press SPACE/UP ARROW, click or tap to jump!</p>
                     <p>Avoid the obstacles!</p>
                 </div>
                 <div class="game-over" id="gameOver" style="display: none;">
@@ -42,6 +42,7 @@
                     <option value="3">Level 3 - Hard</option>
                     <option value="4">Level 4 - Expert</option>
                     <option value="5">Level 5 - Insane</option>
+                    <option value="developer">Developer's Challenge</option>
                 </select>
             </div>
             <div class="game-mode-selector">

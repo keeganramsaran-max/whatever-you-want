@@ -2,8 +2,7 @@ class GeometryDash {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = 800;
-        this.canvas.height = 400;
+        this.setupCanvas();
 
         this.gameState = 'menu';
         this.gameMode = 'mixed';
@@ -37,11 +36,11 @@ class GeometryDash {
             persistentWaveTrail: [],
             waveVelocity: 0,
             waveHorizontalVelocity: 0,
-            waveSpeed: 5.625,
+            waveSpeed: 3.75,
             shipVelocity: 0,
-            shipSpeed: 6,
+            shipSpeed: 3.75,
             ballVelocity: 0,
-            ballSpeed: 6,
+            ballSpeed: 5.625 / 1.25 / 1.25,
             rotation: 0,
             gravityDirection: 1,
             canChangeGravity: true
@@ -59,9 +58,10 @@ class GeometryDash {
         this.speedPortals = [];
         this.finishPortals = [];
         this.camera = { x: 0 };
-        this.baseSpeed = 7.03125;
-        this.speed = 7.03125;
+        this.baseSpeed = 7.03125 / 1.25 / 1.25 / 1.5;
+        this.speed = 7.03125 / 1.25 / 1.25 / 1.5;
         this.speedMultiplier = 1;
+        this.gameSpeedMultiplier = 1;
         this.lastObstacle = 0;
         this.showHitboxes = false;
         this.autoPlay = false;
@@ -169,6 +169,9 @@ class GeometryDash {
             if ((e.code === 'Space' || e.code === 'ArrowUp') && this.gameState === 'playing') {
                 e.preventDefault();
                 this.jump();
+            } else if (e.code === 'Space' && this.gameState === 'gameOver') {
+                e.preventDefault();
+                this.restartGame();
             }
         });
 
@@ -185,6 +188,24 @@ class GeometryDash {
 
         this.canvas.addEventListener('mouseup', () => {
             this.mousePressed = false;
+        });
+
+        // Touch controls for mobile
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.mousePressed = true;
+            if (this.gameState === 'playing') {
+                this.jump();
+            }
+        });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.mousePressed = false;
+        });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
         });
 
         document.getElementById('startBtn').addEventListener('click', () => {
@@ -217,6 +238,11 @@ class GeometryDash {
             this.volumeLevel = e.target.value / 100;
         });
 
+        document.getElementById('gameSpeed').addEventListener('input', (e) => {
+            this.gameSpeedMultiplier = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = e.target.value + 'x';
+        });
+
         document.getElementById('gameMode').addEventListener('change', (e) => {
             this.gameMode = e.target.value;
             this.updateInstructions();
@@ -225,9 +251,15 @@ class GeometryDash {
         });
 
         document.getElementById('levelSelect').addEventListener('change', (e) => {
-            this.currentLevel = parseInt(e.target.value);
-            this.generateLevel();
-            document.getElementById('currentLevel').textContent = this.currentLevel;
+            if (e.target.value === 'developer') {
+                this.currentLevel = 'developer';
+                this.loadDeveloperChallenge();
+                document.getElementById('currentLevel').textContent = "Developer's Challenge";
+            } else {
+                this.currentLevel = parseInt(e.target.value);
+                this.generateLevel();
+                document.getElementById('currentLevel').textContent = this.currentLevel;
+            }
         });
     }
 
@@ -287,7 +319,7 @@ class GeometryDash {
         }
 
         if (this.player.onGround || this.player.y >= this.canvas.height - this.player.height - 50) {
-            this.player.velocity = -this.player.jumpPower * this.speedMultiplier;
+            this.player.velocity = -this.player.jumpPower;
             this.player.onGround = false;
             this.playSound('jump');
 
@@ -312,7 +344,7 @@ class GeometryDash {
 
         // Calculate 45-degree movement components - diagonal movement
         // Wave should move diagonally at constant speed, not add to base speed
-        const totalSpeed = this.player.waveSpeed * this.speedMultiplier * 1.5;
+        const totalSpeed = this.player.waveSpeed * 1.5;
         const diagonalVertical = totalSpeed * 0.707; // sin(45°) = 0.707
         const diagonalHorizontal = totalSpeed * 0.707; // cos(45°) = 0.707
 
@@ -329,7 +361,7 @@ class GeometryDash {
         this.player.y += this.player.waveVelocity;
 
         // Apply horizontal movement - wave always moves forward like slopes
-        this.player.x += this.player.waveHorizontalVelocity;
+        this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -355,9 +387,9 @@ class GeometryDash {
         if (mode !== 'ship') return;
 
         const isPressed = this.keys['Space'] || this.keys['ArrowUp'] || this.mousePressed;
-        const acceleration = 0.8 * this.speedMultiplier;
-        const deceleration = 0.6 * this.speedMultiplier;
-        const maxSpeed = this.player.shipSpeed * this.speedMultiplier;
+        const acceleration = 0.8;
+        const deceleration = 0.6;
+        const maxSpeed = this.player.shipSpeed;
 
         if (isPressed) {
             this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration, -maxSpeed);
@@ -543,6 +575,143 @@ class GeometryDash {
             height: portal.height,
             rotation: portal.rotation || 0
         })) : [];
+    }
+
+    loadDeveloperChallenge() {
+        // Developer's Challenge level data
+        const developerLevelData = {
+            "name": "Developer's Challenge",
+            "difficulty": 4,
+            "objects": [
+                {"x": 580, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 620, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 660, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 700, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 740, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 780, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 820, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 860, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 900, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 940, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 980, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1020, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1060, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1100, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 820, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 780, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 740, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 700, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 660, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 620, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 580, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 540, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 860, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 900, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 940, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 980, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1020, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1060, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1100, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1140, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1180, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1220, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1260, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1300, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1340, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1380, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1420, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1460, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1500, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1540, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1580, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1620, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1660, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1700, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1740, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1220, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1260, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1300, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1340, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1380, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1420, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1460, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1500, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1540, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1580, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1620, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1660, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1700, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1740, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1980, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 1980, "y": 200, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 1980, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2180, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2180, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2180, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2420, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2420, "y": 180, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2420, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2700, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2700, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2740, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2700, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2740, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2780, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2820, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2860, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2900, "y": 80, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2780, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2820, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2860, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2900, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3320, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3320, "y": 180, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3320, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3520, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3520, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3520, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3720, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3720, "y": 180, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3720, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3980, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3980, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3980, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4020, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4060, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4100, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4140, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4180, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4220, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4020, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4060, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4100, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4140, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4180, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 4220, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0}
+            ],
+            "portals": [
+                {"x": 200, "y": 0, "width": 60, "height": 350, "type": "portal", "rotation": 0, "mode": "wave"},
+                {"x": 3060, "y": 0, "width": 60, "height": 350, "type": "portal", "rotation": 0, "mode": "ship"}
+            ],
+            "speedPortals": [],
+            "finishPortals": [
+                {"x": 4440, "y": 0, "width": 60, "height": 350, "type": "finishPortal", "rotation": 0}
+            ]
+        };
+
+        // Set up as custom level
+        this.isCustomLevel = true;
+        this.customLevelData = developerLevelData;
+
+        // Reset level state
+        this.obstacles = [];
+        this.portals = [];
+        this.speedPortals = [];
+        this.finishPortals = [];
+        this.speed = this.baseSpeed;
+
+        // Load the level data
+        this.loadCustomLevel();
     }
 
     getSpeedPortalColor(speed) {
@@ -954,7 +1123,9 @@ class GeometryDash {
     }
 
     generateSectionObstacles(startX, endX, mode) {
-        for (let x = startX; x < endX; x += 150 + Math.random() * 50) { // More consistent spacing: 150-200px apart
+        // Add more space after portals for cube sections
+        const firstObstacleX = mode === 'cube' ? startX + 200 : startX;
+        for (let x = firstObstacleX; x < endX; x += 150 + Math.random() * 50) { // More consistent spacing: 150-200px apart
             const type = Math.random();
 
             if (mode === 'cube') {
@@ -2196,7 +2367,7 @@ class GeometryDash {
 
         // For wave mode, horizontal movement is handled in handleWaveMovement
         if (mode !== 'wave') {
-            this.player.x += this.speed;
+            this.player.x += this.speed * this.gameSpeedMultiplier;
         }
         this.score = Math.floor(this.player.x / 10);
 
@@ -2783,6 +2954,45 @@ class GeometryDash {
         }
     }
 
+    setupCanvas() {
+        // Set canvas size based on screen size - more aggressive mobile sizing
+        const isMobile = window.innerWidth <= 768;
+        const isTablet = window.innerWidth > 768 && window.innerWidth <= 1024;
+
+        let maxWidth, maxHeight;
+
+        if (isMobile) {
+            // Mobile: use almost full screen width and more height
+            maxWidth = Math.min(800, window.innerWidth * 0.98);
+            maxHeight = Math.min(400, window.innerHeight * 0.6); // Increased from 0.4 to 0.6
+        } else if (isTablet) {
+            // Tablet: moderate sizing
+            maxWidth = Math.min(800, window.innerWidth * 0.9);
+            maxHeight = Math.min(400, window.innerHeight * 0.5);
+        } else {
+            // Desktop: keep original sizing
+            maxWidth = 800;
+            maxHeight = 400;
+        }
+
+        // Maintain aspect ratio
+        const aspectRatio = 800 / 400;
+        let canvasWidth = maxWidth;
+        let canvasHeight = maxWidth / aspectRatio;
+
+        if (canvasHeight > maxHeight) {
+            canvasHeight = maxHeight;
+            canvasWidth = maxHeight * aspectRatio;
+        }
+
+        this.canvas.width = canvasWidth;
+        this.canvas.height = canvasHeight;
+
+        // Set CSS size to match canvas size
+        this.canvas.style.width = canvasWidth + 'px';
+        this.canvas.style.height = canvasHeight + 'px';
+    }
+
     restartGame() {
         this.attempts++;
         document.getElementById('attempts').textContent = this.attempts;
@@ -2818,5 +3028,17 @@ class GeometryDash {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new GeometryDash();
+    const game = new GeometryDash();
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        game.setupCanvas();
+    });
+
+    // Handle orientation change on mobile
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            game.setupCanvas();
+        }, 100);
+    });
 });
