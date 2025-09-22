@@ -226,6 +226,12 @@ body {
     color: #00ff88;
 }
 
+.controls-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .volume-control {
     display: flex;
     align-items: center;
