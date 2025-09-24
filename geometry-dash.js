@@ -731,12 +731,13 @@ class GeometryDash {
         const baseCubeLength = 1000 * lengthMultiplier;
         const baseWaveLength = 800 * lengthMultiplier;
         const baseShipLength = 800 * lengthMultiplier;
+        const baseBallLength = 600 * lengthMultiplier;
 
         return [
             { type: 'standard_jumps', mode: 'cube', x: 400, length: baseCubeLength, maxObjects: Math.floor(objectsPerLevel * 0.4) },
             { type: 'standard_flight', mode: 'wave', x: 400 + baseCubeLength, length: baseWaveLength, maxObjects: Math.floor(objectsPerLevel * 0.3) },
-            { type: 'standard_ship', mode: 'ship', x: 400 + baseCubeLength + baseWaveLength, length: baseShipLength, maxObjects: Math.floor(objectsPerLevel * 0.3) }
-            // { type: 'standard_ball', mode: 'ball', x: 3000, length: 600, maxObjects: Math.floor(objectsPerLevel * 0.1) } // Commented out ball mode
+            { type: 'standard_ship', mode: 'ship', x: 400 + baseCubeLength + baseWaveLength, length: baseShipLength, maxObjects: Math.floor(objectsPerLevel * 0.3) },
+            { type: 'standard_ball', mode: 'ball', x: 400 + baseCubeLength + baseWaveLength + baseShipLength, length: baseBallLength, maxObjects: Math.floor(objectsPerLevel * 0.1) }
         ];
     }
 
@@ -839,26 +840,40 @@ class GeometryDash {
     }
 
     generateBallObstacle(x, difficulty) {
-        const type = Math.random();
-        const difficultyMultiplier = this.getDifficultyMultiplier(difficulty);
+        // Ball mode generates 2 bottom spikes and 2 top spikes with spacing
+        const spikePattern = Math.random();
 
-        if (type < 0.4 * difficultyMultiplier) {
+        if (spikePattern < 0.5) {
+            // Generate 2 bottom spikes with spacing
             this.obstacles.push({
-                x: x, y: this.canvas.height - 50 - 40,
-                width: 40, height: 40, type: 'spike'
+                x: x,
+                y: this.canvas.height - 50 - 40,
+                width: 40,
+                height: 40,
+                type: 'spike'
             });
-        } else if (type < 0.7) {
-            const platformHeight = 60 + Math.random() * (60 * difficultyMultiplier);
-            const platformWidth = Math.max(35, 50 - (difficultyMultiplier - 1) * 10);
             this.obstacles.push({
-                x: x, y: this.canvas.height - 50 - platformHeight,
-                width: platformWidth, height: 15, type: 'platform'
+                x: x + 80, // Increased spacing from 50 to 80
+                y: this.canvas.height - 50 - 40,
+                width: 40,
+                height: 40,
+                type: 'spike'
             });
         } else {
-            const floatingY = 100 + Math.random() * 120;
+            // Generate 2 top spikes (upside down) with spacing
             this.obstacles.push({
-                x: x, y: floatingY,
-                width: 40, height: 15, type: 'platform'
+                x: x,
+                y: 50,
+                width: 40,
+                height: 40,
+                type: 'spike-up'
+            });
+            this.obstacles.push({
+                x: x + 80, // Increased spacing from 50 to 80
+                y: 50,
+                width: 40,
+                height: 40,
+                type: 'spike-up'
             });
         }
     }
@@ -1068,12 +1083,14 @@ class GeometryDash {
             if (section > 0) {
                 // Determine what mode the NEXT section will need
                 let portalToMode;
-                if (section % 3 === 0) {
+                if (section % 4 === 0) {
                     portalToMode = 'cube'; // Next section is cube-only
-                } else if (section % 3 === 1) {
+                } else if (section % 4 === 1) {
                     portalToMode = 'wave'; // Next section is wave
-                } else {
+                } else if (section % 4 === 2) {
                     portalToMode = 'ship'; // Next section is ship
+                } else {
+                    portalToMode = 'ball'; // Next section is ball
                 }
 
                 console.log(`Portal at x${startX - 100}: ${currentMode} → ${portalToMode} (for section ${section})`);
@@ -1092,7 +1109,7 @@ class GeometryDash {
             console.log(`Section ${section}: x${startX}-${endX}, planned mode: ${currentMode}`);
 
             // FORCE cube sections to only have cube obstacles (no pillars ever)
-            if (section % 3 === 0) { // Sections 0, 3, 6, 9 should be cube-only
+            if (section % 4 === 0) { // Sections 0, 4, 8 should be cube-only
                 console.log(`🎯 FORCING section ${section} to be cube-only (no pillars)`);
                 this.generateSectionObstacles(startX, endX, 'cube');
             } else {
@@ -1103,8 +1120,7 @@ class GeometryDash {
     }
 
     getNextGameMode(currentMode) {
-        const modes = ['cube', 'wave', 'ship']; // Removed 'ball' temporarily
-        // const modes = ['cube', 'wave', 'ship', 'ball']; // Original with ball mode
+        const modes = ['cube', 'wave', 'ship', 'ball']; // Original with ball mode
         const currentIndex = modes.indexOf(currentMode);
         return modes[(currentIndex + 1) % modes.length];
     }
@@ -1154,12 +1170,29 @@ class GeometryDash {
                     height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
                 });
             } else if (mode === 'ball') {
-                console.log('Ball mode: ONLY generating spikes');
-                // ONLY bottom spikes for testing
-                this.obstacles.push({
-                    x: x, y: this.canvas.height - 50 - 40,
-                    width: 40, height: 40, type: 'spike'
-                });
+                console.log('Ball mode: ONLY generating spikes at top and bottom');
+                const spikePattern = Math.random();
+                if (spikePattern < 0.5) {
+                    // Generate 2 bottom spikes with spacing
+                    this.obstacles.push({
+                        x: x, y: this.canvas.height - 50 - 40,
+                        width: 40, height: 40, type: 'spike'
+                    });
+                    this.obstacles.push({
+                        x: x + 80, y: this.canvas.height - 50 - 40,
+                        width: 40, height: 40, type: 'spike'
+                    });
+                } else {
+                    // Generate 2 top spikes (upside down) with spacing
+                    this.obstacles.push({
+                        x: x, y: 50,
+                        width: 40, height: 40, type: 'spike-up'
+                    });
+                    this.obstacles.push({
+                        x: x + 80, y: 50,
+                        width: 40, height: 40, type: 'spike-up'
+                    });
+                }
             }
         }
     }
@@ -1361,12 +1394,22 @@ class GeometryDash {
         // Add inset margin to make spike hitbox smaller than visual shape
         const inset = 6; // 6 pixels smaller on each side for spikes
 
-        // Spike triangle: top point in center, base at bottom
-        const points = [
-            { x: obstacle.x + obstacle.width/2, y: obstacle.y + inset }, // top point (inset from top)
-            { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset }, // bottom-left (inset)
-            { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset } // bottom-right (inset)
-        ];
+        let points;
+        if (obstacle.type === 'spike-up') {
+            // Upside-down spike: point at bottom, base at top
+            points = [
+                { x: obstacle.x + obstacle.width/2, y: obstacle.y + obstacle.height - inset }, // bottom point (inset from bottom)
+                { x: obstacle.x + inset, y: obstacle.y + inset }, // top-left (inset)
+                { x: obstacle.x + obstacle.width - inset, y: obstacle.y + inset } // top-right (inset)
+            ];
+        } else {
+            // Regular spike: top point in center, base at bottom
+            points = [
+                { x: obstacle.x + obstacle.width/2, y: obstacle.y + inset }, // top point (inset from top)
+                { x: obstacle.x + inset, y: obstacle.y + obstacle.height - inset }, // bottom-left (inset)
+                { x: obstacle.x + obstacle.width - inset, y: obstacle.y + obstacle.height - inset } // bottom-right (inset)
+            ];
+        }
 
         // Apply rotation if present
         if (obstacle.rotation && obstacle.rotation !== 0) {
@@ -1494,7 +1537,7 @@ class GeometryDash {
                 }
             } else {
                 // Check for spike collision (triangular)
-                if (obstacle.type === 'spike') {
+                if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
                     if (this.checkSpikeCollision(playerHitbox, obstacle)) {
                         this.gameOver();
                         return;
@@ -1572,7 +1615,7 @@ class GeometryDash {
                 }
             } else {
                 // Check for spike collision (triangular)
-                if (obstacle.type === 'spike') {
+                if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
                     if (this.checkSpikeCollision(playerHitbox, obstacle)) {
                         this.gameOver();
                         return;
@@ -1636,7 +1679,7 @@ class GeometryDash {
 
         for (let obstacle of this.obstacles) {
             // Check for spike collision (triangular)
-            if (obstacle.type === 'spike') {
+            if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
                 if (this.checkSpikeCollision(playerHitbox, obstacle)) {
                     this.gameOver();
                     return;
@@ -1868,6 +1911,19 @@ class GeometryDash {
                 this.ctx.moveTo(obstacle.x + obstacle.width/2, obstacle.y);
                 this.ctx.lineTo(obstacle.x, obstacle.y + obstacle.height);
                 this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            } else if (obstacle.type === 'spike-up') {
+                this.ctx.fillStyle = '#ff4444';
+                this.ctx.beginPath();
+                // Upside down spike: point at the bottom
+                this.ctx.moveTo(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height);
+                this.ctx.lineTo(obstacle.x, obstacle.y);
+                this.ctx.lineTo(obstacle.x + obstacle.width, obstacle.y);
                 this.ctx.closePath();
                 this.ctx.fill();
 
@@ -2386,7 +2442,7 @@ class GeometryDash {
                 continue;
             }
 
-            if (obstacle.type === 'spike') {
+            if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
                 // Draw spike triangle hitbox
                 const trianglePoints = this.getSpikeTrianglePoints(obstacle);
                 this.ctx.strokeStyle = '#FF0000'; // Red for deadly spikes
@@ -2583,7 +2639,7 @@ class GeometryDash {
                         const obstacleDistance = immediateObstacles[0].distance;
 
                         // Only jump for obstacles that actually require jumping
-                        if (nextObstacle.type === 'spike' || nextObstacle.type === 'platform' ||
+                        if (nextObstacle.type === 'spike' || nextObstacle.type === 'spike-up' || nextObstacle.type === 'platform' ||
                             nextObstacle.type === 'slope-up' || nextObstacle.type === 'slope-down' ||
                             nextObstacle.type === 'steep-up' || nextObstacle.type === 'steep-down') {
 
@@ -2595,7 +2651,7 @@ class GeometryDash {
                                 // More forgiving jump ranges for better survival
                                 let jumpRange = { min: 60, max: 120 };
 
-                                if (nextObstacle.type === 'spike') {
+                                if (nextObstacle.type === 'spike' || nextObstacle.type === 'spike-up') {
                                     jumpRange = { min: 70, max: 110 }; // Closer for spikes
                                 } else if (nextObstacle.type === 'platform') {
                                     jumpRange = { min: 80, max: 130 }; // Earlier for platforms
