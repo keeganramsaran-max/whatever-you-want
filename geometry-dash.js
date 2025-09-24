@@ -62,6 +62,9 @@ class GeometryDash {
         this.speed = 7.03125 / 1.25 / 1.25 / 1.5;
         this.speedMultiplier = 1;
         this.gameSpeedMultiplier = 1;
+        this.lastTime = 0;
+        this.targetFPS = 60;
+        this.deltaTime = 0;
         this.lastObstacle = 0;
         this.showHitboxes = false;
         this.autoPlay = false;
@@ -361,7 +364,7 @@ class GeometryDash {
         this.player.y += this.player.waveVelocity;
 
         // Apply horizontal movement - wave always moves forward like slopes
-        this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier;
+        this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier * this.deltaTime;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -425,8 +428,8 @@ class GeometryDash {
         if (mode !== 'ball') return;
 
         const adjustedGravity = this.player.gravity * this.speedMultiplier;
-        this.player.velocity += adjustedGravity * this.player.gravityDirection;
-        this.player.y += this.player.velocity;
+        this.player.velocity += adjustedGravity * this.player.gravityDirection * this.deltaTime;
+        this.player.y += this.player.velocity * this.deltaTime;
 
         this.player.rotation += this.player.velocity * 0.1;
 
@@ -1691,8 +1694,8 @@ class GeometryDash {
                 break;
             default:
                 const adjustedGravity = this.player.gravity * this.speedMultiplier;
-                this.player.velocity += adjustedGravity;
-                this.player.y += this.player.velocity;
+                this.player.velocity += adjustedGravity * this.deltaTime;
+                this.player.y += this.player.velocity * this.deltaTime;
                 break;
         }
 
@@ -2367,7 +2370,7 @@ class GeometryDash {
 
         // For wave mode, horizontal movement is handled in handleWaveMovement
         if (mode !== 'wave') {
-            this.player.x += this.speed * this.gameSpeedMultiplier;
+            this.player.x += this.speed * this.gameSpeedMultiplier * this.deltaTime;
         }
         this.score = Math.floor(this.player.x / 10);
 
@@ -3020,10 +3023,20 @@ class GeometryDash {
         document.getElementById('pauseBtn').textContent = 'Pause';
     }
 
-    gameLoop() {
+    gameLoop(currentTime = 0) {
+        // Calculate delta time for frame-independent movement
+        if (this.lastTime === 0) {
+            this.lastTime = currentTime;
+        }
+        this.deltaTime = (currentTime - this.lastTime) / (1000 / this.targetFPS);
+        this.lastTime = currentTime;
+
+        // Cap delta time to prevent large jumps when tab is unfocused
+        this.deltaTime = Math.min(this.deltaTime, 2);
+
         this.update();
         this.render();
-        requestAnimationFrame(() => this.gameLoop());
+        requestAnimationFrame((time) => this.gameLoop(time));
     }
 }
 
