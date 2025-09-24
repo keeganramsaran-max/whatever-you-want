@@ -36,11 +36,11 @@ class GeometryDash {
             persistentWaveTrail: [],
             waveVelocity: 0,
             waveHorizontalVelocity: 0,
-            waveSpeed: 3.75,
+            waveSpeed: 3.75 * 1.25 * 1.25 * 1.25,
             shipVelocity: 0,
-            shipSpeed: 3.75,
+            shipSpeed: 3.75 * 1.25 * 1.25 * 1.25,
             ballVelocity: 0,
-            ballSpeed: 5.625 / 1.25 / 1.25,
+            ballSpeed: (5.625 / 1.25 / 1.25) * 1.25 * 1.25 * 1.25,
             rotation: 0,
             gravityDirection: 1,
             canChangeGravity: true
@@ -58,8 +58,8 @@ class GeometryDash {
         this.speedPortals = [];
         this.finishPortals = [];
         this.camera = { x: 0 };
-        this.baseSpeed = 7.03125 / 1.25 / 1.25 / 1.5;
-        this.speed = 7.03125 / 1.25 / 1.25 / 1.5;
+        this.baseSpeed = (7.03125 / 1.25 / 1.25 / 1.5) * 1.25 * 1.25 * 1.25;
+        this.speed = (7.03125 / 1.25 / 1.25 / 1.5) * 1.25 * 1.25 * 1.25;
         this.speedMultiplier = 1;
         this.gameSpeedMultiplier = 1;
         this.lastTime = 0;
@@ -361,7 +361,7 @@ class GeometryDash {
             this.player.waveHorizontalVelocity = diagonalHorizontal; // Right movement
         }
 
-        this.player.y += this.player.waveVelocity;
+        this.player.y += this.player.waveVelocity * this.deltaTime;
 
         // Apply horizontal movement - wave always moves forward like slopes
         this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier * this.deltaTime;
@@ -395,12 +395,12 @@ class GeometryDash {
         const maxSpeed = this.player.shipSpeed;
 
         if (isPressed) {
-            this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration, -maxSpeed);
+            this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration * this.deltaTime, -maxSpeed);
         } else {
-            this.player.shipVelocity = Math.min(this.player.shipVelocity + deceleration, maxSpeed);
+            this.player.shipVelocity = Math.min(this.player.shipVelocity + deceleration * this.deltaTime, maxSpeed);
         }
 
-        this.player.y += this.player.shipVelocity;
+        this.player.y += this.player.shipVelocity * this.deltaTime;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -439,19 +439,11 @@ class GeometryDash {
         if (this.player.gravityDirection > 0) {
             if (this.player.y + this.player.height >= ground) {
                 this.player.y = ground - this.player.height;
-                this.player.velocity = 0;
                 this.player.onGround = true;
                 this.player.canChangeGravity = true;
-
-                for (let i = 0; i < 3; i++) {
-                    this.particles.push({
-                        x: this.player.x + Math.random() * this.player.width,
-                        y: this.player.y + this.player.height,
-                        vx: (Math.random() - 0.5) * 4,
-                        vy: -Math.random() * 3,
-                        life: 0.8,
-                        decay: 0.03
-                    });
+                // Clamp velocity to prevent going through ground
+                if (this.player.velocity > 0) {
+                    this.player.velocity = 0;
                 }
             } else {
                 this.player.onGround = false;
@@ -459,19 +451,11 @@ class GeometryDash {
         } else {
             if (this.player.y <= ceiling) {
                 this.player.y = ceiling;
-                this.player.velocity = 0;
                 this.player.onGround = true;
                 this.player.canChangeGravity = true;
-
-                for (let i = 0; i < 3; i++) {
-                    this.particles.push({
-                        x: this.player.x + Math.random() * this.player.width,
-                        y: this.player.y,
-                        vx: (Math.random() - 0.5) * 4,
-                        vy: Math.random() * 3,
-                        life: 0.8,
-                        decay: 0.03
-                    });
+                // Clamp velocity to prevent going through ceiling
+                if (this.player.velocity < 0) {
+                    this.player.velocity = 0;
                 }
             } else {
                 this.player.onGround = false;
