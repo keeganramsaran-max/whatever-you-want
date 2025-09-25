@@ -22,8 +22,18 @@
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div class="game-ui">
                 <div class="instructions" id="instructions">
-                    <p id="instructionText">Press SPACE/UP ARROW, click or tap to jump!</p>
-                    <p>Avoid the obstacles!</p>
+                    <div id="normalInstructions">
+                        <p id="instructionText">Press SPACE/UP ARROW, click or tap to jump!</p>
+                        <p>Avoid the obstacles!</p>
+                    </div>
+                    <div id="warningBox" style="display: none;" class="warning-box">
+                        <h2 id="warningTitle">⚠️ WARNING ⚠️</h2>
+                        <p id="warningMessage"></p>
+                        <div class="warning-buttons">
+                            <button id="continueBtn" class="warning-btn continue-btn">Continue</button>
+                            <button id="cancelBtn" class="warning-btn cancel-btn">Cancel</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="game-over" id="gameOver" style="display: none;">
                     <h2>Game Over!</h2>
@@ -43,6 +53,7 @@
                     <option value="4">Level 4 - Expert</option>
                     <option value="5">Level 5 - Insane</option>
                     <option value="developer">Developer's Challenge</option>
+                    <option value="impossible">Impossible Level</option>
                 </select>
             </div>
             <div class="game-mode-selector">
@@ -58,7 +69,9 @@
             <button id="startBtn">Start Game</button>
             <button id="pauseBtn" disabled>Pause</button>
             <button id="autoPlayBtn">Auto Play</button>
+            <button id="practiceBtn">Practice Mode</button>
             <button id="editorBtn">Level Editor</button>
+            <button id="backToEditorBtn" style="display: none;">Back to Editor</button>
             <button id="showHitboxesBtn">Show Hitboxes</button>
             <div class="volume-control">
                 <label for="volume">Volume:</label>

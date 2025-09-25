@@ -74,6 +74,11 @@ class GeometryDash {
         this.jumpSpamTimer = 0;
         this.jumpSpamInterval = 100; // 100ms between spam jumps
         this.lastWaveAction = 0;
+
+        // Practice mode variables
+        this.practiceMode = false;
+        this.checkpoints = [];
+        this.lastCheckpoint = null;
         this.lastShipAction = 0;
         this.currentWaveDirection = null; // 'up', 'down', or null
         this.lastJumpedObstacle = null; // Track which obstacle we last jumped for
@@ -166,6 +171,41 @@ class GeometryDash {
         }
     }
 
+    showLevelNotification(title, message, onContinue, onCancel) {
+        const normalInstructions = document.getElementById('normalInstructions');
+        const warningBox = document.getElementById('warningBox');
+        const titleElement = document.getElementById('warningTitle');
+        const messageElement = document.getElementById('warningMessage');
+        const continueBtn = document.getElementById('continueBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        // Hide normal instructions and show warning
+        normalInstructions.style.display = 'none';
+        warningBox.style.display = 'block';
+
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+
+        // Remove any existing event listeners
+        const newContinueBtn = continueBtn.cloneNode(true);
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+        // Add new event listeners
+        newContinueBtn.addEventListener('click', () => {
+            warningBox.style.display = 'none';
+            normalInstructions.style.display = 'block';
+            onContinue();
+        });
+
+        newCancelBtn.addEventListener('click', () => {
+            warningBox.style.display = 'none';
+            normalInstructions.style.display = 'block';
+            onCancel();
+        });
+    }
+
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
@@ -175,6 +215,12 @@ class GeometryDash {
             } else if (e.code === 'Space' && this.gameState === 'gameOver') {
                 e.preventDefault();
                 this.restartGame();
+            } else if (e.code === 'KeyZ' && this.practiceMode && this.gameState === 'playing') {
+                e.preventDefault();
+                this.placeCheckpoint();
+            } else if (e.code === 'KeyX' && this.practiceMode && this.gameState === 'playing') {
+                e.preventDefault();
+                this.deleteCheckpoint();
             }
         });
 
@@ -223,6 +269,10 @@ class GeometryDash {
             window.location.href = 'level-editor.html';
         });
 
+        document.getElementById('backToEditorBtn').addEventListener('click', () => {
+            this.returnToEditor();
+        });
+
         document.getElementById('showHitboxesBtn').addEventListener('click', () => {
             this.showHitboxes = !this.showHitboxes;
             document.getElementById('showHitboxesBtn').textContent =
@@ -231,6 +281,10 @@ class GeometryDash {
 
         document.getElementById('autoPlayBtn').addEventListener('click', () => {
             this.toggleAutoPlay();
+        });
+
+        document.getElementById('practiceBtn').addEventListener('click', () => {
+            this.togglePracticeMode();
         });
 
         document.getElementById('restartBtn').addEventListener('click', () => {
@@ -258,26 +312,52 @@ class GeometryDash {
                 this.currentLevel = 'developer';
                 this.loadDeveloperChallenge();
                 document.getElementById('currentLevel').textContent = "Developer's Challenge";
+            } else if (e.target.value === 'impossible') {
+                this.showLevelNotification(
+                    "Warning: Impossible Level Selected",
+                    "The developer's way to vent pent up rage",
+                    () => {
+                        this.currentLevel = 'impossible';
+                        this.loadImpossibleChallenge();
+                        document.getElementById('currentLevel').textContent = "Impossible";
+                    },
+                    () => {
+                        // Reset to previous level if cancelled
+                        document.getElementById('levelSelect').value = '1';
+                        this.currentLevel = 1;
+                        this.generateLevel();
+                        document.getElementById('currentLevel').textContent = "1";
+                    }
+                );
             } else {
                 this.currentLevel = parseInt(e.target.value);
                 this.generateLevel();
                 document.getElementById('currentLevel').textContent = this.currentLevel;
             }
+            this.updateBackToEditorButton();
         });
     }
 
     updateInstructions() {
         const instructionText = document.getElementById('instructionText');
+        let baseText = '';
+
         if (this.gameMode === 'mixed') {
-            instructionText.textContent = 'Controls change with each gamemode! Watch for portals!';
+            baseText = 'Controls change with each gamemode! Watch for portals!';
         } else if (this.gameMode === 'wave' || this.currentGameMode === 'wave') {
-            instructionText.textContent = 'Hold SPACE/UP ARROW or click to fly up, release to fly down!';
+            baseText = 'Hold SPACE/UP ARROW or click to fly up, release to fly down!';
         } else if (this.gameMode === 'ship' || this.currentGameMode === 'ship') {
-            instructionText.textContent = 'Hold SPACE/UP ARROW or click to fly up, release to fall down!';
+            baseText = 'Hold SPACE/UP ARROW or click to fly up, release to fall down!';
         } else if (this.gameMode === 'ball' || this.currentGameMode === 'ball') {
-            instructionText.textContent = 'Press SPACE/UP ARROW or click to change gravity direction!';
+            baseText = 'Press SPACE/UP ARROW or click to change gravity direction!';
         } else {
-            instructionText.textContent = 'Press SPACE/UP ARROW or click to jump!';
+            baseText = 'Press SPACE/UP ARROW or click to jump!';
+        }
+
+        if (this.practiceMode) {
+            instructionText.textContent = baseText + ' | Practice: Z = Checkpoint, X = Delete';
+        } else {
+            instructionText.textContent = baseText;
         }
     }
 
@@ -471,9 +551,11 @@ class GeometryDash {
                 try {
                     this.customLevelData = JSON.parse(customLevel);
                     this.isCustomLevel = true;
+                    this.updateBackToEditorButton();
                 } catch (e) {
                     console.error('Invalid custom level data');
                     this.isCustomLevel = false;
+                    this.updateBackToEditorButton();
                 }
             }
         }
@@ -696,6 +778,283 @@ class GeometryDash {
         this.speedPortals = [];
         this.finishPortals = [];
         this.speed = this.baseSpeed;
+
+        // Load the level data
+        this.loadCustomLevel();
+    }
+
+    loadImpossibleChallenge() {
+        // Impossible Challenge - The developer's way to vent pent up rage
+        const impossibleLevelData = {
+            "name": "Impossible Challenge",
+            "difficulty": 10,
+            "objects": [
+                {"x": 600, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 640, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 680, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 720, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 760, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 800, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 840, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 880, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 920, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 960, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1000, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1040, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1080, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1120, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1160, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1200, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1240, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1280, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1320, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1360, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1400, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1440, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1480, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1520, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1560, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1600, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1640, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1680, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1720, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1760, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 560, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 600, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 640, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 680, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 720, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 760, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 800, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 840, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 880, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 920, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 960, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1000, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1040, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1080, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1120, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1160, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1200, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1240, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1280, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1320, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1360, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1400, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1440, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1480, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1520, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1560, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1600, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1640, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1680, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1720, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1760, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1800, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1840, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1800, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1840, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 2440, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2440, "y": 180, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2440, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2640, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2640, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2640, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2860, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2860, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 2860, "y": 180, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3140, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3140, "y": 0, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3140, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3180, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3220, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3260, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3180, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3220, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3260, "y": 60, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3140, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3180, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3220, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3260, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3300, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3300, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3340, "y": 260, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 3340, "y": 100, "width": 40, "height": 100, "type": "wall-top", "rotation": 0},
+                {"x": 560, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 600, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 640, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 680, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 720, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 760, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 800, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 840, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 880, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 920, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 960, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1000, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1040, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1080, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1120, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1160, "y": 0, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1200, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1240, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1280, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1320, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1360, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1400, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1560, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1600, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1640, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1800, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1840, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 0},
+                {"x": 1440, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1480, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1520, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1680, "y": 40, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1720, "y": 80, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 1760, "y": 120, "width": 40, "height": 40, "type": "slope-up", "rotation": 90},
+                {"x": 640, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 680, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 720, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 760, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 800, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 840, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 960, "y": 320, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1000, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1040, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1080, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1120, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1160, "y": 160, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1200, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1240, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1280, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1320, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1360, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1400, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1440, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1480, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1520, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1560, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1600, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1640, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1800, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1840, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 180},
+                {"x": 1680, "y": 200, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1720, "y": 240, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 1760, "y": 280, "width": 40, "height": 40, "type": "slope-up", "rotation": 270},
+                {"x": 3900, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 3900, "y": 160, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 3900, "y": 60, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4180, "y": 0, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4180, "y": 120, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4180, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4180, "y": 300, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4460, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4460, "y": 200, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4460, "y": 0, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4460, "y": 40, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4680, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4680, "y": 100, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4680, "y": 0, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4900, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4900, "y": 160, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 4900, "y": 0, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5180, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5180, "y": 0, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5180, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5220, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5260, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5300, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5340, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5380, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5420, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5460, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5500, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5540, "y": 260, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5220, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5260, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5300, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5340, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5380, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5420, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5460, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5500, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5540, "y": 80, "width": 40, "height": 100, "type": "wall-bottom", "rotation": 0},
+                {"x": 5920, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6100, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6280, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6460, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6400, "y": 160, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6520, "y": 220, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6620, "y": 80, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6400, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6440, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6480, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6520, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6560, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6600, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6640, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6680, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6720, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6760, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6800, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6840, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6880, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6920, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6960, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7000, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7040, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7080, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7120, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7160, "y": 320, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6500, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6540, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6580, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6620, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6660, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6700, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6740, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6780, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6820, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6860, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6900, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6940, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6980, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7020, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7060, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7100, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 7140, "y": 0, "width": 40, "height": 40, "type": "spike", "rotation": 0},
+                {"x": 6720, "y": 280, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6780, "y": 160, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6840, "y": 260, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6880, "y": 160, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 6940, "y": 260, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 7000, "y": 160, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 7060, "y": 260, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 7100, "y": 160, "width": 40, "height": 40, "type": "platform", "rotation": 0},
+                {"x": 7160, "y": 260, "width": 40, "height": 40, "type": "platform", "rotation": 0}
+            ],
+            "portals": [
+                {"x": 200, "y": 0, "width": 60, "height": 350, "type": "portal", "rotation": 0, "mode": "wave"},
+                {"x": 3580, "y": 0, "width": 60, "height": 350, "type": "portal", "rotation": 0, "mode": "ship"},
+                {"x": 5700, "y": 0, "width": 60, "height": 350, "type": "portal", "rotation": 0, "mode": "ball"}
+            ],
+            "speedPortals": [],
+            "finishPortals": [
+                {"x": 7360, "y": 0, "width": 60, "height": 350, "type": "finishPortal", "rotation": 0}
+            ]
+        };
+
+        // Clear existing obstacles and set up for custom level
+        this.obstacles = [];
+        this.portals = [];
+        this.speedPortals = [];
+        this.finishPortals = [];
+        this.speed = this.baseSpeed;
+
+        // Store the level data for loading
+        this.customLevelData = impossibleLevelData;
+        this.isCustomLevel = true;
 
         // Load the level data
         this.loadCustomLevel();
@@ -1678,8 +2037,57 @@ class GeometryDash {
         const playerHitbox = this.getPlayerHitbox();
 
         for (let obstacle of this.obstacles) {
+            if (obstacle.type === 'platform') {
+                // Platforms are solid surfaces for wave/ship modes but don't kill
+                const obstacleHitbox = {
+                    x: obstacle.x,
+                    y: obstacle.y,
+                    width: obstacle.width,
+                    height: obstacle.height
+                };
+
+                if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                    // Push player away from platform instead of killing
+                    const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+
+                    // Determine which side of the platform the player hit
+                    const playerCenterX = this.player.x + this.player.width / 2;
+                    const playerCenterY = this.player.y + this.player.height / 2;
+                    const obstacleCenterX = obstacle.x + obstacle.width / 2;
+                    const obstacleCenterY = obstacle.y + obstacle.height / 2;
+
+                    const dx = playerCenterX - obstacleCenterX;
+                    const dy = playerCenterY - obstacleCenterY;
+
+                    // Push away from the closest edge
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        // Hit from left or right
+                        if (dx > 0) {
+                            this.player.x = obstacle.x + obstacle.width;
+                        } else {
+                            this.player.x = obstacle.x - this.player.width;
+                        }
+                        if (mode === 'wave') {
+                            this.player.waveHorizontalVelocity = 0;
+                        }
+                    } else {
+                        // Hit from top or bottom
+                        if (dy > 0) {
+                            this.player.y = obstacle.y + obstacle.height;
+                        } else {
+                            this.player.y = obstacle.y - this.player.height;
+                        }
+                        if (mode === 'wave') {
+                            this.player.waveVelocity = 0;
+                        } else if (mode === 'ship') {
+                            this.player.shipVelocity = 0;
+                        }
+                    }
+                    continue;
+                }
+            }
             // Check for spike collision (triangular)
-            if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
+            else if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
                 if (this.checkSpikeCollision(playerHitbox, obstacle)) {
                     this.gameOver();
                     return;
@@ -2264,6 +2672,67 @@ class GeometryDash {
         this.ctx.restore();
     }
 
+    drawCheckpoints() {
+        if (!this.practiceMode || this.checkpoints.length === 0) return;
+
+        this.ctx.save();
+        this.ctx.translate(-this.camera.x, 0);
+
+        for (let i = 0; i < this.checkpoints.length; i++) {
+            const checkpoint = this.checkpoints[i];
+
+            // Only draw checkpoints that are visible on screen
+            if (checkpoint.x < this.camera.x - 100 ||
+                checkpoint.x > this.camera.x + this.canvas.width + 100) {
+                continue;
+            }
+
+            const size = 15;
+            const x = checkpoint.x - size / 2;
+            const y = checkpoint.y - size / 2;
+
+            // Draw checkpoint marker with animated glow
+            const time = Date.now() * 0.005;
+            const glowIntensity = 0.7 + Math.sin(time + i * 0.5) * 0.3;
+
+            // Glow effect
+            this.ctx.globalAlpha = glowIntensity * 0.4;
+            this.ctx.fillStyle = '#00ffff';
+            this.ctx.fillRect(x - 3, y - 3, size + 6, size + 6);
+
+            // Main checkpoint body
+            this.ctx.globalAlpha = 1;
+            this.ctx.fillStyle = '#00cccc';
+            this.ctx.fillRect(x, y, size, size);
+
+            // Inner highlight
+            this.ctx.fillStyle = '#00ffff';
+            this.ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+
+            // Border
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(x, y, size, size);
+
+            // Draw number for multiple checkpoints
+            if (this.checkpoints.length > 1) {
+                this.ctx.fillStyle = 'white';
+                this.ctx.font = '10px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText((i + 1).toString(), x + size/2, y + size/2 + 3);
+            }
+
+            // Mark the last checkpoint (active one) with special indicator
+            if (this.lastCheckpoint === checkpoint) {
+                this.ctx.strokeStyle = '#ffff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.strokeRect(x - 2, y - 2, size + 4, size + 4);
+            }
+        }
+
+        this.ctx.restore();
+    }
+
     checkLevelCompletion() {
         // For custom levels with finish portals, check for finish portal collision
         if (this.isCustomLevel && this.finishPortals && this.finishPortals.length > 0) {
@@ -2541,6 +3010,7 @@ class GeometryDash {
         this.drawPortals();
         this.drawSpeedPortals();
         this.drawFinishPortals();
+        this.drawCheckpoints();
         this.drawParticles();
         this.drawPlayer();
 
@@ -2577,6 +3047,133 @@ class GeometryDash {
         if (this.autoPlay) {
             this.startGame();
         }
+    }
+
+    togglePracticeMode() {
+        this.practiceMode = !this.practiceMode;
+        const practiceBtn = document.getElementById('practiceBtn');
+        practiceBtn.textContent = this.practiceMode ? 'Exit Practice' : 'Practice Mode';
+
+        // Clear checkpoints when exiting practice mode
+        if (!this.practiceMode) {
+            this.checkpoints = [];
+            this.lastCheckpoint = null;
+        }
+
+        this.updateInstructions();
+        this.updateBackToEditorButton();
+    }
+
+    updateBackToEditorButton() {
+        const backBtn = document.getElementById('backToEditorBtn');
+        if (this.isCustomLevel && !['developer', 'impossible'].includes(this.currentLevel)) {
+            // Show button for user-created custom levels, but not for built-in special levels
+            backBtn.style.display = 'inline-block';
+        } else {
+            backBtn.style.display = 'none';
+        }
+    }
+
+    returnToEditor() {
+        if (this.isCustomLevel && this.customLevelData) {
+            // Store the current level data in localStorage so the editor can load it
+            localStorage.setItem('editorLevelData', JSON.stringify(this.customLevelData));
+            localStorage.setItem('returnedFromTest', 'true');
+
+            // Navigate back to the level editor
+            window.location.href = 'level-editor.html';
+        }
+    }
+
+    placeCheckpoint() {
+        if (!this.practiceMode || this.gameState !== 'playing') return;
+
+        const checkpoint = {
+            x: this.player.x,
+            y: this.player.y,
+            cameraX: this.camera.x,
+            velocity: this.player.velocity,
+            currentGameMode: this.currentGameMode,
+            gravityDirection: this.player.gravityDirection,
+            attempts: this.attempts,
+            score: this.score,
+            // Save portal states
+            portalStates: this.portals.map(portal => ({ used: portal.used || false })),
+            speedPortalStates: this.speedPortals.map(portal => ({ used: portal.used || false })),
+            finishPortalStates: this.finishPortals.map(portal => ({ used: portal.used || false }))
+        };
+
+        this.checkpoints.push(checkpoint);
+        this.lastCheckpoint = checkpoint;
+
+        // Play sound effect
+        this.playSound('jump');
+
+        console.log('Checkpoint placed at x:', checkpoint.x);
+    }
+
+    deleteCheckpoint() {
+        if (!this.practiceMode || this.checkpoints.length === 0) return;
+
+        // Remove the most recent checkpoint
+        this.checkpoints.pop();
+        this.lastCheckpoint = this.checkpoints.length > 0 ? this.checkpoints[this.checkpoints.length - 1] : null;
+
+        // Play sound effect
+        this.playSound('death');
+
+        console.log('Checkpoint deleted. Remaining checkpoints:', this.checkpoints.length);
+    }
+
+    respawnAtCheckpoint() {
+        if (!this.practiceMode || !this.lastCheckpoint) return false;
+
+        // Restore player state from checkpoint
+        this.player.x = this.lastCheckpoint.x;
+        this.player.y = this.lastCheckpoint.y;
+        this.player.velocity = this.lastCheckpoint.velocity;
+        this.player.gravityDirection = this.lastCheckpoint.gravityDirection;
+        this.currentGameMode = this.lastCheckpoint.currentGameMode;
+        this.camera.x = this.lastCheckpoint.cameraX;
+        this.attempts = this.lastCheckpoint.attempts;
+        this.score = this.lastCheckpoint.score;
+
+        // Reset other player states
+        this.player.onGround = false;
+        this.player.waveVelocity = 0;
+        this.player.waveHorizontalVelocity = 0;
+        this.player.shipVelocity = 0;
+        this.player.ballVelocity = 0;
+        this.player.rotation = 0;
+        this.player.canChangeGravity = true;
+
+        // Clear wave trail
+        this.player.trail = [];
+        this.player.persistentWaveTrail = [];
+
+        // Restore portal states
+        if (this.lastCheckpoint.portalStates) {
+            for (let i = 0; i < this.portals.length && i < this.lastCheckpoint.portalStates.length; i++) {
+                this.portals[i].used = this.lastCheckpoint.portalStates[i].used;
+            }
+        }
+        if (this.lastCheckpoint.speedPortalStates) {
+            for (let i = 0; i < this.speedPortals.length && i < this.lastCheckpoint.speedPortalStates.length; i++) {
+                this.speedPortals[i].used = this.lastCheckpoint.speedPortalStates[i].used;
+            }
+        }
+        if (this.lastCheckpoint.finishPortalStates) {
+            for (let i = 0; i < this.finishPortals.length && i < this.lastCheckpoint.finishPortalStates.length; i++) {
+                this.finishPortals[i].used = this.lastCheckpoint.finishPortalStates[i].used;
+            }
+        }
+
+        // Update UI
+        document.getElementById('score').textContent = this.score;
+        document.getElementById('attempts').textContent = this.attempts;
+
+        console.log('Respawned at checkpoint x:', this.lastCheckpoint.x);
+        return true;
     }
 
     handleAutoPlay() {
@@ -2965,6 +3562,12 @@ class GeometryDash {
             return;
         }
 
+        // In practice mode, try to respawn at checkpoint instead of game over
+        if (this.practiceMode && this.respawnAtCheckpoint()) {
+            this.gameState = 'playing';
+            return;
+        }
+
         this.gameState = 'gameOver';
 
         // Set game over content for death
@@ -3051,6 +3654,12 @@ class GeometryDash {
         this.camera.x = 0;
         this.score = 0;
         this.particles = [];
+
+        // Clear checkpoints only if not in practice mode
+        if (!this.practiceMode) {
+            this.checkpoints = [];
+            this.lastCheckpoint = null;
+        }
 
         this.generateLevel();
         this.updateInstructions(); // Update instructions to match reset game mode

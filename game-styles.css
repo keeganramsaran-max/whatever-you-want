@@ -304,6 +304,93 @@ body {
     animation: pulse 2s ease-in-out infinite;
 }
 
+.warning-box {
+    text-align: center;
+    background: rgba(255, 69, 0, 0.95);
+    padding: 30px;
+    border-radius: 15px;
+    border: 3px solid #ff4500;
+    box-shadow:
+        0 0 30px rgba(255, 69, 0, 0.6),
+        inset 0 0 20px rgba(255, 69, 0, 0.2);
+    animation: warningPulse 1.5s ease-in-out infinite;
+}
+
+.warning-box h2 {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    color: #ffffff;
+    text-shadow: 0 0 15px #ff4500;
+    font-weight: bold;
+}
+
+.warning-box p {
+    font-size: 1.3rem;
+    margin-bottom: 20px;
+    color: #ffffff;
+    text-shadow: 0 0 10px #ff4500;
+    font-style: italic;
+}
+
+.warning-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.warning-btn {
+    padding: 12px 25px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    pointer-events: all;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.continue-btn {
+    background: linear-gradient(45deg, #ff4500, #ff6600);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
+}
+
+.continue-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 69, 0, 0.6);
+    background: linear-gradient(45deg, #ff6600, #ff8800);
+}
+
+.cancel-btn {
+    background: linear-gradient(45deg, #666666, #888888);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 102, 102, 0.4);
+}
+
+.cancel-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 102, 102, 0.6);
+    background: linear-gradient(45deg, #888888, #aaaaaa);
+}
+
+@keyframes warningPulse {
+    0%, 100% {
+        box-shadow:
+            0 0 30px rgba(255, 69, 0, 0.6),
+            inset 0 0 20px rgba(255, 69, 0, 0.2);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow:
+            0 0 50px rgba(255, 69, 0, 0.8),
+            inset 0 0 30px rgba(255, 69, 0, 0.3);
+        transform: scale(1.02);
+    }
+}
+
 /* Mobile styles */
 @media (max-width: 768px) {
     body {
