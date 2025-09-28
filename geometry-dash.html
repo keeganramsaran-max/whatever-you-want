@@ -40,6 +40,249 @@
                     <p>Final Score: <span id="finalScore">0</span></p>
                     <button id="restartBtn">Play Again</button>
                 </div>
+                <div class="help-menu" id="helpMenu" style="display: none;">
+                    <div class="help-content">
+                        <div class="help-header">
+                            <h2>🎮 Geometry Dash Help</h2>
+                            <button id="closeHelpBtn" class="close-btn">×</button>
+                        </div>
+                        <div class="help-sections">
+                            <div class="help-section">
+                                <h3>🎯 Game Objective</h3>
+                                <p>Navigate your character through obstacles to reach the end of each level. Avoid hitting spikes, walls, and other hazards!</p>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>🎮 Controls</h3>
+                                <div class="controls-grid">
+                                    <div class="control-item">
+                                        <strong>SPACEBAR / UP ARROW / CLICK</strong>
+                                        <p>Jump (Cube Mode) / Fly (Ship Mode) / Move (Wave/Ball Mode)</p>
+                                    </div>
+                                    <div class="control-item">
+                                        <strong>HOLD</strong>
+                                        <p>Continuous movement in Ship, Wave, and Ball modes</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>🔄 Game Modes</h3>
+                                <div class="modes-grid">
+                                    <div class="mode-item">
+                                        <strong>🔷 Cube Mode</strong>
+                                        <p>Click to jump. Land on platforms and avoid spikes.</p>
+                                    </div>
+                                    <div class="mode-item">
+                                        <strong>🚀 Ship Mode</strong>
+                                        <p>Hold to fly up, release to fall down. Navigate through tight spaces.</p>
+                                    </div>
+                                    <div class="mode-item">
+                                        <strong>🌊 Wave Mode</strong>
+                                        <p>Hold to move up, release to move down. Flow through wave-like paths.</p>
+                                    </div>
+                                    <div class="mode-item">
+                                        <strong>⚽ Ball Mode</strong>
+                                        <p>Click to change gravity direction. Bounce between surfaces.</p>
+                                    </div>
+                                    <div class="mode-item">
+                                        <strong>🎲 Mixed Mode</strong>
+                                        <p>Combines all modes with portals to switch between them.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>🎚️ Features</h3>
+                                <div class="features-grid">
+                                    <div class="feature-item">
+                                        <strong>Practice Mode</strong>
+                                        <p>Place checkpoints to practice difficult sections without starting over.</p>
+                                    </div>
+                                    <div class="feature-item">
+                                        <strong>Auto Play</strong>
+                                        <p>Watch the AI attempt to complete the level automatically.</p>
+                                    </div>
+                                    <div class="feature-item">
+                                        <strong>Speed Control</strong>
+                                        <p>Adjust game speed from 0.25x to 2x for practice or challenge.</p>
+                                    </div>
+                                    <div class="feature-item">
+                                        <strong>Show Hitboxes</strong>
+                                        <p>Display collision boundaries to understand precise hit detection.</p>
+                                    </div>
+                                    <div class="feature-item">
+                                        <strong>Level Editor</strong>
+                                        <p>Create and test your own custom levels with various obstacles.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>💡 Tips & Tricks</h3>
+                                <ul class="tips-list">
+                                    <li>Start with easier levels to learn the mechanics</li>
+                                    <li>Use Practice Mode to master difficult sections</li>
+                                    <li>Watch the rhythm - many obstacles follow musical patterns</li>
+                                    <li>In Wave Mode, small movements are often better than large ones</li>
+                                    <li>Jump pads and portals change your momentum and mode</li>
+                                    <li>Purple portals flip your gravity in Ball Mode</li>
+                                    <li>Each mode has different physics - experiment to understand them</li>
+                                </ul>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>🏆 Levels</h3>
+                                <div class="levels-info">
+                                    <p><strong>Level 1-5:</strong> Progressive difficulty from Easy to Insane</p>
+                                    <p><strong>Developer's Challenge:</strong> Expert-level custom design</p>
+                                    <p><strong>Impossible Level:</strong> The ultimate test of skill</p>
+                                </div>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>🏆 Leaderboard</h3>
+                                <div class="leaderboard-section" id="leaderboardSection">
+                                    <div class="leaderboard-controls">
+                                        <div class="leaderboard-filters">
+                                            <select id="leaderboardLevel" class="leaderboard-filter">
+                                                <option value="">All Levels</option>
+                                                <option value="1">Level 1 - Easy</option>
+                                                <option value="2">Level 2 - Medium</option>
+                                                <option value="3">Level 3 - Hard</option>
+                                                <option value="4">Level 4 - Expert</option>
+                                                <option value="5">Level 5 - Insane</option>
+                                                <option value="developer">Developer's Challenge</option>
+                                                <option value="impossible">Impossible Level</option>
+                                            </select>
+                                            <select id="leaderboardMode" class="leaderboard-filter">
+                                                <option value="all">All Modes</option>
+                                                <option value="cube">Cube Mode</option>
+                                                <option value="ship">Ship Mode</option>
+                                                <option value="wave">Wave Mode</option>
+                                                <option value="ball">Ball Mode</option>
+                                                <option value="mixed">Mixed Mode</option>
+                                            </select>
+                                            <select id="leaderboardSort" class="leaderboard-filter">
+                                                <option value="score">Best Score</option>
+                                                <option value="attempts">Fewest Attempts</option>
+                                                <option value="time">Fastest Time</option>
+                                                <option value="date">Most Recent</option>
+                                            </select>
+                                        </div>
+                                        <div class="leaderboard-actions">
+                                            <button id="changeNameBtn" class="leaderboard-btn">Change Name</button>
+                                            <button id="clearLeaderboardBtn" class="leaderboard-btn danger">Clear Data</button>
+                                        </div>
+                                    </div>
+                                    <div class="leaderboard-content" id="leaderboardContent">
+                                        <div class="no-scores">
+                                            <p>🎮 Complete some levels to see your scores!</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="help-section">
+                                <h3>📊 Your Progress Analytics</h3>
+                                <div class="analytics-dashboard" id="analyticsDashboard">
+                                    <div class="analytics-grid">
+                                        <div class="analytics-item">
+                                            <strong>Total Deaths</strong>
+                                            <span id="totalDeaths">0</span>
+                                        </div>
+                                        <div class="analytics-item">
+                                            <strong>Most Common Issue</strong>
+                                            <span id="dominantPattern">Getting started...</span>
+                                        </div>
+                                        <div class="analytics-item">
+                                            <strong>Current Level Deaths</strong>
+                                            <span id="currentLevelDeaths">0</span>
+                                        </div>
+                                        <div class="analytics-item">
+                                            <strong>Suggestions Given</strong>
+                                            <span id="suggestionsCount">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="failure-hotspots">
+                                        <h4>🔥 Trouble Spots</h4>
+                                        <div id="hotspotsList">
+                                            <p class="no-data">Play the game to see your failure analysis!</p>
+                                        </div>
+                                    </div>
+                                    <div class="analytics-actions">
+                                        <button id="resetAnalyticsBtn" class="analytics-btn">Reset Analytics</button>
+                                        <button id="exportAnalyticsBtn" class="analytics-btn">Export Data</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tutorial Overlay System -->
+        <div class="tutorial-overlay" id="tutorialOverlay" style="display: none;">
+            <div class="tutorial-content">
+                <div class="tutorial-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="tutorialProgress"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">Step 1 of 5</span>
+                </div>
+
+                <div class="tutorial-main">
+                    <div class="tutorial-highlight" id="tutorialHighlight"></div>
+                    <div class="tutorial-card" id="tutorialCard">
+                        <div class="tutorial-header">
+                            <h3 id="tutorialTitle">Welcome to Geometry Dash!</h3>
+                            <button id="closeTutorialBtn" class="tutorial-close">×</button>
+                        </div>
+                        <div class="tutorial-body">
+                            <p id="tutorialText">Let's learn the basics of the game together.</p>
+                            <div class="tutorial-visual" id="tutorialVisual"></div>
+                        </div>
+                        <div class="tutorial-actions">
+                            <button id="tutorialPrevBtn" class="tutorial-btn secondary">Previous</button>
+                            <button id="tutorialNextBtn" class="tutorial-btn primary">Next</button>
+                            <button id="tutorialSkipBtn" class="tutorial-btn skip">Skip Tutorial</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Levels Page -->
+        <div class="user-levels-page" id="userLevelsPage" style="display: none;">
+            <div class="user-levels-header">
+                <div class="page-nav">
+                    <button id="backToHubBtn" class="back-btn">← Back to Game Hub</button>
+                    <h2>My Custom Levels</h2>
+                </div>
+                <div class="levels-actions">
+                    <button id="uploadLevelPageBtn" class="primary-btn">Upload New Level</button>
+                    <div class="levels-sort">
+                        <label for="levelsSortSelect">Sort by:</label>
+                        <select id="levelsSortSelect">
+                            <option value="date">Date Added</option>
+                            <option value="name">Name</option>
+                            <option value="rating">Rating</option>
+                            <option value="difficulty">Difficulty</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-levels-content">
+                <div class="levels-grid" id="levelsGrid">
+                    <div class="empty-levels-state" id="emptyLevelsState">
+                        <div class="empty-icon">📁</div>
+                        <h3>No Custom Levels Yet</h3>
+                        <p>Upload your first custom level to get started!</p>
+                        <button id="uploadFirstLevelBtn" class="primary-btn">Upload Level</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -73,6 +316,10 @@
             <button id="editorBtn">Level Editor</button>
             <button id="backToEditorBtn" style="display: none;">Back to Editor</button>
             <button id="showHitboxesBtn">Show Hitboxes</button>
+            <button id="tutorialBtn">Tutorial</button>
+            <button id="userLevelsBtn">User Levels</button>
+            <button id="uploadLevelBtn">Upload Level</button>
+            <button id="helpBtn">Help</button>
             <div class="volume-control">
                 <label for="volume">Volume:</label>
                 <input type="range" id="volume" min="0" max="100" value="50">

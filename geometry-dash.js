@@ -47,6 +47,67 @@ class GeometryDash {
         };
 
         // Hitbox offsets for more forgiving collision
+        // Smart Help System - Failure Analytics
+        this.failureAnalytics = {
+            enabled: true,
+            sessionData: {
+                totalDeaths: 0,
+                levelDeaths: {},
+                failureHotspots: [],
+                timeSpentOnSections: {},
+                inputPatterns: [],
+                lastFailureTime: null
+            },
+            patterns: {
+                earlyJump: 0,
+                lateReaction: 0,
+                wrongModeTransition: 0,
+                timingIssues: 0,
+                gravityConfusion: 0
+            },
+            suggestions: [],
+            lastSuggestionTime: 0,
+            suggestionCooldown: 10000 // 10 seconds
+        };
+
+        // Load existing analytics data
+        this.loadAnalyticsData();
+
+        // Track section entry times for analytics
+        this.sectionTracker = {
+            currentSection: null,
+            entryTime: null,
+            lastPosition: 0
+        };
+
+        // Flag to track if analytics event listeners are attached
+        this.analyticsListenersAttached = false;
+        this.tutorialListenersAttached = false;
+        this.leaderboardListenersAttached = false;
+
+        // Tutorial System
+        this.tutorialSystem = {
+            active: false,
+            currentStep: 0,
+            steps: [],
+            completed: this.loadTutorialProgress(),
+            paused: false
+        };
+
+        // Leaderboard System
+        this.leaderboard = {
+            currentPlayer: this.loadPlayerName(),
+            scores: this.loadLeaderboardData(),
+            enabled: true
+        };
+
+        // Custom Level Upload System
+        this.customLevels = {
+            slots: this.loadCustomLevels(),
+            maxSlots: 10,
+            currentSlot: null
+        };
+
         this.hitboxOffset = {
             player: 4,     // Player hitbox is 4px smaller on each side
             obstacle: 3    // Obstacle hitboxes are 3px smaller on each side
@@ -87,6 +148,7 @@ class GeometryDash {
         this.mousePressed = false;
 
         this.setupEventListeners();
+        this.updateLevelSelector(); // Initialize custom levels in dropdown
         this.checkForCustomLevel();
         this.generateLevel();
         this.gameLoop();
@@ -209,6 +271,14 @@ class GeometryDash {
     setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
+            if (e.code === 'Escape') {
+                const helpMenu = document.getElementById('helpMenu');
+                if (helpMenu.style.display === 'flex') {
+                    this.hideHelpMenu();
+                    e.preventDefault();
+                    return;
+                }
+            }
             if ((e.code === 'Space' || e.code === 'ArrowUp') && this.gameState === 'playing') {
                 e.preventDefault();
                 this.jump();
@@ -279,6 +349,93 @@ class GeometryDash {
                 this.showHitboxes ? 'Hide Hitboxes' : 'Show Hitboxes';
         });
 
+        const helpBtn = document.getElementById('helpBtn');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const helpMenu = document.getElementById('helpMenu');
+
+        console.log('Help menu elements found:', {
+            helpBtn: !!helpBtn,
+            closeHelpBtn: !!closeHelpBtn,
+            helpMenu: !!helpMenu
+        });
+
+        if (helpBtn) {
+            helpBtn.addEventListener('click', () => {
+                console.log('Help button clicked');
+                this.showHelpMenu();
+            });
+        } else {
+            console.error('Help button not found');
+        }
+
+        const tutorialBtn = document.getElementById('tutorialBtn');
+        if (tutorialBtn) {
+            tutorialBtn.addEventListener('click', () => {
+                console.log('Tutorial button clicked');
+                this.startTutorial('basic');
+            });
+        } else {
+            console.error('Tutorial button not found');
+        }
+
+        const userLevelsBtn = document.getElementById('userLevelsBtn');
+        if (userLevelsBtn) {
+            userLevelsBtn.addEventListener('click', () => {
+                console.log('User Levels button clicked');
+                this.showUserLevelsPage();
+            });
+        } else {
+            console.error('User Levels button not found');
+        }
+
+        const uploadLevelBtn = document.getElementById('uploadLevelBtn');
+        console.log('Upload Level button element:', uploadLevelBtn);
+        console.log('Button style display:', uploadLevelBtn?.style.display);
+        console.log('Button computed style:', window.getComputedStyle(uploadLevelBtn));
+        if (uploadLevelBtn) {
+            console.log('Adding event listener to Upload Level button');
+
+            // Test basic click
+            uploadLevelBtn.onclick = (e) => {
+                console.log('Upload Level button ONCLICK triggered!', e);
+                alert('Upload button clicked via onclick!');
+            };
+
+            uploadLevelBtn.addEventListener('click', (e) => {
+                console.log('Upload Level button clicked via addEventListener!', e);
+                e.preventDefault();
+                e.stopPropagation();
+                this.showLevelUploadModal();
+            });
+
+            // Test if button is disabled
+            console.log('Button disabled:', uploadLevelBtn.disabled);
+            console.log('Button style pointer-events:', uploadLevelBtn.style.pointerEvents);
+            console.log('Event listener added successfully');
+        } else {
+            console.error('Upload Level button not found');
+        }
+
+        if (closeHelpBtn) {
+            closeHelpBtn.addEventListener('click', () => {
+                console.log('Close help button clicked');
+                this.hideHelpMenu();
+            });
+        } else {
+            console.error('Close help button not found');
+        }
+
+        if (helpMenu) {
+            helpMenu.addEventListener('click', (e) => {
+                // Only close if clicking the background overlay, not the content
+                if (e.target === helpMenu) {
+                    this.hideHelpMenu();
+                }
+            });
+        } else {
+            console.error('Help menu not found');
+        }
+
         document.getElementById('autoPlayBtn').addEventListener('click', () => {
             this.toggleAutoPlay();
         });
@@ -329,6 +486,10 @@ class GeometryDash {
                         document.getElementById('currentLevel').textContent = "1";
                     }
                 );
+            } else if (e.target.value.startsWith('custom_')) {
+                // Handle custom level selection
+                const slotNumber = parseInt(e.target.value.replace('custom_', ''));
+                this.loadUploadedLevel(slotNumber);
             } else {
                 this.currentLevel = parseInt(e.target.value);
                 this.generateLevel();
@@ -3076,6 +3237,18 @@ class GeometryDash {
     }
 
     levelComplete() {
+        // Record completion for leaderboard (if not in auto-play mode)
+        if (!this.autoPlay && this.leaderboard.enabled) {
+            const completionTime = Date.now() - this.levelStartTime;
+            this.recordCompletion(
+                this.currentLevel,
+                this.currentGameMode,
+                this.attempts,
+                completionTime,
+                this.score
+            );
+        }
+
         if (this.autoPlay) {
             // Auto-progress to next level
             if (this.currentLevel < this.maxLevel) {
@@ -3196,6 +3369,9 @@ class GeometryDash {
         this.checkLevelCompletion();
 
         document.getElementById('score').textContent = this.score;
+
+        // Update section tracking for analytics
+        this.updateSectionTracking();
     }
 
     drawHitboxes() {
@@ -3859,6 +4035,14 @@ class GeometryDash {
     }
 
     gameOver() {
+        // Track the failure for analytics
+        this.trackFailure(
+            this.player.x + this.camera.x,
+            this.player.y,
+            this.currentGameMode,
+            'collision'
+        );
+
         if (this.autoPlay) {
             // Auto-restart if auto-play is enabled
             setTimeout(() => {
@@ -3944,9 +4128,1969 @@ class GeometryDash {
         this.canvas.style.height = canvasHeight + 'px';
     }
 
+    // === SMART HELP SYSTEM - ANALYTICS METHODS ===
+
+    loadAnalyticsData() {
+        try {
+            const stored = localStorage.getItem('geometryDash_analytics');
+            if (stored) {
+                const data = JSON.parse(stored);
+                this.failureAnalytics.sessionData = { ...this.failureAnalytics.sessionData, ...data.sessionData };
+                this.failureAnalytics.patterns = { ...this.failureAnalytics.patterns, ...data.patterns };
+            }
+        } catch (e) {
+            console.log('Could not load analytics data:', e);
+        }
+    }
+
+    saveAnalyticsData() {
+        try {
+            const dataToSave = {
+                sessionData: this.failureAnalytics.sessionData,
+                patterns: this.failureAnalytics.patterns,
+                lastSaved: Date.now()
+            };
+            localStorage.setItem('geometryDash_analytics', JSON.stringify(dataToSave));
+        } catch (e) {
+            console.log('Could not save analytics data:', e);
+        }
+    }
+
+    trackFailure(x, y, gameMode, reason = 'collision') {
+        if (!this.failureAnalytics.enabled) return;
+
+        const failure = {
+            timestamp: Date.now(),
+            level: this.currentLevel,
+            gameMode: gameMode,
+            position: { x, y },
+            reason: reason,
+            attempts: this.attempts,
+            timeInSection: this.sectionTracker.entryTime ? Date.now() - this.sectionTracker.entryTime : 0,
+            playerVelocity: {
+                x: this.speed,
+                y: this.player.velocity || this.player.waveVelocity || this.player.shipVelocity || this.player.ballVelocity
+            }
+        };
+
+        // Update session data
+        this.failureAnalytics.sessionData.totalDeaths++;
+        this.failureAnalytics.sessionData.lastFailureTime = failure.timestamp;
+
+        // Track level-specific deaths
+        const levelKey = `${this.currentLevel}_${gameMode}`;
+        if (!this.failureAnalytics.sessionData.levelDeaths[levelKey]) {
+            this.failureAnalytics.sessionData.levelDeaths[levelKey] = [];
+        }
+        this.failureAnalytics.sessionData.levelDeaths[levelKey].push(failure);
+
+        // Add to failure hotspots
+        this.failureAnalytics.sessionData.failureHotspots.push(failure);
+
+        // Keep only last 100 failures to prevent storage bloat
+        if (this.failureAnalytics.sessionData.failureHotspots.length > 100) {
+            this.failureAnalytics.sessionData.failureHotspots.shift();
+        }
+
+        // Analyze failure pattern
+        this.analyzeFailurePattern(failure);
+
+        // Generate suggestions
+        this.generateFailureSuggestion(failure);
+
+        // Save data
+        this.saveAnalyticsData();
+    }
+
+    analyzeFailurePattern(failure) {
+        const recentFailures = this.getRecentFailures(failure.position, 50); // Within 50px
+
+        if (recentFailures.length >= 3) {
+            // Multiple failures in same spot - analyze pattern
+            const avgTimeInSection = recentFailures.reduce((sum, f) => sum + f.timeInSection, 0) / recentFailures.length;
+
+            if (avgTimeInSection < 1000) {
+                this.failureAnalytics.patterns.earlyJump++;
+            } else if (avgTimeInSection > 3000) {
+                this.failureAnalytics.patterns.lateReaction++;
+            }
+
+            // Check for mode transition issues
+            const modeChanges = recentFailures.filter(f => f.gameMode !== this.currentGameMode);
+            if (modeChanges.length > 0) {
+                this.failureAnalytics.patterns.wrongModeTransition++;
+            }
+
+            // Check for gravity confusion in ball mode
+            if (failure.gameMode === 'ball' && Math.abs(failure.playerVelocity.y) > 5) {
+                this.failureAnalytics.patterns.gravityConfusion++;
+            }
+        }
+    }
+
+    getRecentFailures(position, radius) {
+        return this.failureAnalytics.sessionData.failureHotspots.filter(failure => {
+            const distance = Math.sqrt(
+                Math.pow(failure.position.x - position.x, 2) +
+                Math.pow(failure.position.y - position.y, 2)
+            );
+            return distance <= radius && failure.level === this.currentLevel;
+        });
+    }
+
+    generateFailureSuggestion(failure) {
+        const now = Date.now();
+        if (now - this.failureAnalytics.lastSuggestionTime < this.failureAnalytics.suggestionCooldown) {
+            return; // Cooldown active
+        }
+
+        const recentFailures = this.getRecentFailures(failure.position, 50);
+        if (recentFailures.length < 3) return; // Need multiple failures to suggest
+
+        let suggestion = null;
+        const dominantPattern = this.getDominantFailurePattern();
+
+        switch (dominantPattern) {
+            case 'earlyJump':
+                suggestion = {
+                    type: 'timing',
+                    title: '⏱️ Timing Tip',
+                    message: 'Try waiting a bit longer before jumping. Watch the obstacle approach more closely.',
+                    action: 'Show timing guide'
+                };
+                break;
+            case 'lateReaction':
+                suggestion = {
+                    type: 'reaction',
+                    title: '⚡ Quick Tip',
+                    message: 'React faster! Try to anticipate obstacles and prepare your timing.',
+                    action: 'Enable practice mode'
+                };
+                break;
+            case 'wrongModeTransition':
+                suggestion = {
+                    type: 'mode',
+                    title: '🔄 Mode Switch Help',
+                    message: `This section requires ${failure.gameMode} mode techniques. Check the controls guide.`,
+                    action: 'Show mode tutorial'
+                };
+                break;
+            case 'gravityConfusion':
+                suggestion = {
+                    type: 'gravity',
+                    title: '🪐 Gravity Guide',
+                    message: 'In ball mode, click to flip gravity. Time your clicks with the obstacle patterns.',
+                    action: 'Show ball mode demo'
+                };
+                break;
+            default:
+                suggestion = {
+                    type: 'general',
+                    title: '💡 Helpful Hint',
+                    message: 'Having trouble here? Try practice mode to place checkpoints and learn this section.',
+                    action: 'Enable practice mode'
+                };
+        }
+
+        if (suggestion) {
+            this.failureAnalytics.suggestions.push(suggestion);
+            this.failureAnalytics.lastSuggestionTime = now;
+            this.showSmartSuggestion(suggestion);
+        }
+    }
+
+    getDominantFailurePattern() {
+        const patterns = this.failureAnalytics.patterns;
+        let maxPattern = 'general';
+        let maxCount = 0;
+
+        for (const [pattern, count] of Object.entries(patterns)) {
+            if (count > maxCount) {
+                maxCount = count;
+                maxPattern = pattern;
+            }
+        }
+
+        return maxPattern;
+    }
+
+    showSmartSuggestion(suggestion) {
+        // Create suggestion UI element
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.className = 'smart-suggestion';
+        suggestionDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 15px;
+            max-width: 300px;
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1250;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            animation: slideInRight 0.5s ease-out;
+        `;
+
+        suggestionDiv.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; color: #00ff88;">${suggestion.title}</h4>
+            <p style="margin: 0 0 15px 0; line-height: 1.4;">${suggestion.message}</p>
+            <div style="display: flex; gap: 10px;">
+                <button class="suggestion-action" style="
+                    background: #00ff88;
+                    color: #1a1a2e;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-weight: bold;
+                ">${suggestion.action}</button>
+                <button class="suggestion-close" style="
+                    background: transparent;
+                    color: #00ff88;
+                    border: 1px solid #00ff88;
+                    padding: 8px 16px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                ">Dismiss</button>
+            </div>
+        `;
+
+        document.body.appendChild(suggestionDiv);
+
+        // Add CSS animation
+        if (!document.getElementById('suggestion-animations')) {
+            const style = document.createElement('style');
+            style.id = 'suggestion-animations';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Event listeners
+        suggestionDiv.querySelector('.suggestion-action').onclick = () => {
+            this.handleSuggestionAction(suggestion);
+            document.body.removeChild(suggestionDiv);
+        };
+
+        suggestionDiv.querySelector('.suggestion-close').onclick = () => {
+            document.body.removeChild(suggestionDiv);
+        };
+
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => {
+            if (document.body.contains(suggestionDiv)) {
+                document.body.removeChild(suggestionDiv);
+            }
+        }, 8000);
+    }
+
+    handleSuggestionAction(suggestion) {
+        switch (suggestion.type) {
+            case 'timing':
+                // Show timing visualization overlay
+                this.showTimingGuide();
+                break;
+            case 'reaction':
+            case 'general':
+                // Enable practice mode
+                if (!this.practiceMode) {
+                    document.getElementById('practiceBtn').click();
+                }
+                break;
+            case 'mode':
+                // Show help menu with mode focus
+                this.showHelpMenu();
+                break;
+            case 'gravity':
+                // Could show ball mode demo in future
+                this.showHelpMenu();
+                break;
+        }
+    }
+
+    showTimingGuide() {
+        // Simple timing indicator overlay
+        const guide = document.createElement('div');
+        guide.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 255, 136, 0.9);
+            color: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            z-index: 1260;
+            text-align: center;
+        `;
+        guide.innerHTML = `
+            <h3>⏱️ Timing Guide</h3>
+            <p>Watch for the rhythm!</p>
+            <p>Jump when obstacles are <strong>2-3 grid spaces</strong> away</p>
+            <button onclick="this.parentElement.remove()" style="
+                background: #1a1a2e;
+                color: #00ff88;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin-top: 10px;
+            ">Got it!</button>
+        `;
+        document.body.appendChild(guide);
+    }
+
+    updateSectionTracking() {
+        const currentPos = this.player.x + this.camera.x;
+        const sectionSize = 100; // Track every 100px sections
+        const currentSection = Math.floor(currentPos / sectionSize);
+
+        if (currentSection !== this.sectionTracker.currentSection) {
+            // Entering new section
+            this.sectionTracker.currentSection = currentSection;
+            this.sectionTracker.entryTime = Date.now();
+            this.sectionTracker.lastPosition = currentPos;
+        }
+    }
+
+    updateAnalyticsDashboard() {
+        // Update total deaths
+        const totalDeathsEl = document.getElementById('totalDeaths');
+        if (totalDeathsEl) {
+            totalDeathsEl.textContent = this.failureAnalytics.sessionData.totalDeaths;
+        }
+
+        // Update dominant pattern
+        const dominantPatternEl = document.getElementById('dominantPattern');
+        if (dominantPatternEl) {
+            const pattern = this.getDominantFailurePattern();
+            const patternNames = {
+                earlyJump: 'Jumping too early',
+                lateReaction: 'Slow reactions',
+                wrongModeTransition: 'Mode confusion',
+                gravityConfusion: 'Gravity timing',
+                timingIssues: 'Timing problems',
+                general: 'General gameplay'
+            };
+            dominantPatternEl.textContent = patternNames[pattern] || 'Getting started...';
+        }
+
+        // Update current level deaths
+        const currentLevelDeathsEl = document.getElementById('currentLevelDeaths');
+        if (currentLevelDeathsEl) {
+            const levelKey = `${this.currentLevel}_${this.currentGameMode}`;
+            const levelDeaths = this.failureAnalytics.sessionData.levelDeaths[levelKey] || [];
+            currentLevelDeathsEl.textContent = levelDeaths.length;
+        }
+
+        // Update suggestions count
+        const suggestionsCountEl = document.getElementById('suggestionsCount');
+        if (suggestionsCountEl) {
+            suggestionsCountEl.textContent = this.failureAnalytics.suggestions.length;
+        }
+
+        // Update hotspots list
+        this.updateHotspotsList();
+    }
+
+    updateHotspotsList() {
+        const hotspotsListEl = document.getElementById('hotspotsList');
+        if (!hotspotsListEl) return;
+
+        const hotspots = this.getFailureHotspots();
+
+        if (hotspots.length === 0) {
+            hotspotsListEl.innerHTML = '<p class="no-data">Play the game to see your failure analysis!</p>';
+            return;
+        }
+
+        hotspotsListEl.innerHTML = hotspots.map(hotspot => `
+            <div class="hotspot-item">
+                <span class="hotspot-location">Level ${hotspot.level} - Position ${Math.round(hotspot.avgPosition)}</span>
+                <span class="hotspot-count">${hotspot.count} deaths</span>
+                <div style="clear: both; font-size: 0.8rem; margin-top: 5px; color: #ccc;">
+                    ${hotspot.mode} mode • Avg time: ${(hotspot.avgTime / 1000).toFixed(1)}s
+                </div>
+            </div>
+        `).join('');
+    }
+
+    getFailureHotspots() {
+        const hotspots = {};
+        const threshold = 2; // Minimum deaths to be considered a hotspot
+
+        this.failureAnalytics.sessionData.failureHotspots.forEach(failure => {
+            const key = `${failure.level}_${Math.floor(failure.position.x / 100)}`; // Group by 100px sections
+
+            if (!hotspots[key]) {
+                hotspots[key] = {
+                    level: failure.level,
+                    mode: failure.gameMode,
+                    positions: [],
+                    times: [],
+                    count: 0
+                };
+            }
+
+            hotspots[key].positions.push(failure.position.x);
+            hotspots[key].times.push(failure.timeInSection);
+            hotspots[key].count++;
+        });
+
+        return Object.values(hotspots)
+            .filter(hotspot => hotspot.count >= threshold)
+            .map(hotspot => ({
+                ...hotspot,
+                avgPosition: hotspot.positions.reduce((a, b) => a + b, 0) / hotspot.positions.length,
+                avgTime: hotspot.times.reduce((a, b) => a + b, 0) / hotspot.times.length
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5); // Top 5 hotspots
+    }
+
+    resetAnalytics() {
+        this.failureAnalytics = {
+            enabled: true,
+            sessionData: {
+                totalDeaths: 0,
+                levelDeaths: {},
+                failureHotspots: [],
+                timeSpentOnSections: {},
+                inputPatterns: [],
+                lastFailureTime: null
+            },
+            patterns: {
+                earlyJump: 0,
+                lateReaction: 0,
+                wrongModeTransition: 0,
+                timingIssues: 0,
+                gravityConfusion: 0
+            },
+            suggestions: [],
+            lastSuggestionTime: 0,
+            suggestionCooldown: 10000
+        };
+
+        localStorage.removeItem('geometryDash_analytics');
+        this.updateAnalyticsDashboard();
+
+        // Show confirmation
+        const confirmation = document.createElement('div');
+        confirmation.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #00ff88;
+            color: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            z-index: 1310;
+            text-align: center;
+        `;
+        confirmation.innerHTML = '✅ Analytics data has been reset!';
+        document.body.appendChild(confirmation);
+
+        setTimeout(() => {
+            if (document.body.contains(confirmation)) {
+                document.body.removeChild(confirmation);
+            }
+        }, 2000);
+    }
+
+    exportAnalytics() {
+        const data = {
+            exportDate: new Date().toISOString(),
+            sessionData: this.failureAnalytics.sessionData,
+            patterns: this.failureAnalytics.patterns,
+            suggestions: this.failureAnalytics.suggestions,
+            hotspots: this.getFailureHotspots()
+        };
+
+        const jsonData = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `geometry_dash_analytics_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // === TUTORIAL SYSTEM ===
+
+    loadTutorialProgress() {
+        try {
+            const progress = localStorage.getItem('geometryDash_tutorialProgress');
+            return progress ? JSON.parse(progress) : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    saveTutorialProgress() {
+        try {
+            localStorage.setItem('geometryDash_tutorialProgress', JSON.stringify(this.tutorialSystem.completed));
+        } catch (e) {
+            console.log('Could not save tutorial progress:', e);
+        }
+    }
+
+    startTutorial(tutorialType = 'basic') {
+        this.tutorialSystem.active = true;
+        this.tutorialSystem.currentStep = 0;
+        this.tutorialSystem.steps = this.getTutorialSteps(tutorialType);
+
+        // Pause the game
+        if (this.gameState === 'playing') {
+            this.tutorialSystem.paused = true;
+            this.gameState = 'paused';
+        }
+
+        this.showTutorialOverlay();
+        this.updateTutorialStep();
+    }
+
+    getTutorialSteps(type) {
+        const tutorials = {
+            basic: [
+                {
+                    title: "Welcome to Geometry Dash! 🎮",
+                    text: "This interactive tutorial will teach you the basics of the game. Let's start with the fundamentals!",
+                    highlight: null,
+                    visual: "🎯 Goal: Navigate through obstacles without crashing!",
+                    position: "center"
+                },
+                {
+                    title: "Basic Controls 🎮",
+                    text: "Use SPACEBAR, UP ARROW, or CLICK to jump. Try it now!",
+                    highlight: "#gameCanvas",
+                    visual: {
+                        type: "keys",
+                        keys: ["SPACE", "↑", "CLICK"]
+                    },
+                    position: "right",
+                    action: "waitForJump"
+                },
+                {
+                    title: "Game Modes 🔄",
+                    text: "Geometry Dash has different game modes. Let's see the mode selector!",
+                    highlight: "#gameMode",
+                    visual: "Different modes change how your character moves",
+                    position: "left"
+                },
+                {
+                    title: "Practice Mode 🎯",
+                    text: "Use Practice Mode to place checkpoints and learn difficult sections without starting over.",
+                    highlight: "#practiceBtn",
+                    visual: "💡 Perfect for learning new levels!",
+                    position: "bottom"
+                },
+                {
+                    title: "Help & Analytics 📊",
+                    text: "Use the Help button to access guides and see your progress analytics!",
+                    highlight: "#helpBtn",
+                    visual: "📈 Track your improvement over time",
+                    position: "bottom"
+                }
+            ],
+            modes: [
+                {
+                    title: "Cube Mode 🔷",
+                    text: "The basic mode. Click to jump and land on platforms. Avoid spikes!",
+                    gameMode: "cube",
+                    visual: "🔷 Jump with precise timing"
+                },
+                {
+                    title: "Ship Mode 🚀",
+                    text: "Hold to fly up, release to fall down. Navigate through tight spaces!",
+                    gameMode: "ship",
+                    visual: "🚀 Smooth flying controls"
+                },
+                {
+                    title: "Wave Mode 🌊",
+                    text: "Hold to move up, release to move down. Flow through wave-like paths!",
+                    gameMode: "wave",
+                    visual: "🌊 Fluid wave movement"
+                },
+                {
+                    title: "Ball Mode ⚽",
+                    text: "Click to flip gravity. Bounce between surfaces with perfect timing!",
+                    gameMode: "ball",
+                    visual: "⚽ Gravity-defying bounces"
+                }
+            ]
+        };
+
+        return tutorials[type] || tutorials.basic;
+    }
+
+    showTutorialOverlay() {
+        const overlay = document.getElementById('tutorialOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.style.pointerEvents = 'all';
+            this.setupTutorialListeners();
+        }
+    }
+
+    hideTutorialOverlay() {
+        const overlay = document.getElementById('tutorialOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.style.pointerEvents = 'none';
+        }
+
+        // Hide any active highlights
+        const highlight = document.getElementById('tutorialHighlight');
+        if (highlight) {
+            highlight.style.display = 'none';
+        }
+
+        // Resume game if it was paused
+        if (this.tutorialSystem.paused) {
+            this.gameState = 'playing';
+            this.tutorialSystem.paused = false;
+        }
+
+        this.tutorialSystem.active = false;
+    }
+
+    setupTutorialListeners() {
+        if (this.tutorialListenersAttached) return;
+
+        const nextBtn = document.getElementById('tutorialNextBtn');
+        const prevBtn = document.getElementById('tutorialPrevBtn');
+        const skipBtn = document.getElementById('tutorialSkipBtn');
+        const closeBtn = document.getElementById('closeTutorialBtn');
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => this.nextTutorialStep());
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => this.prevTutorialStep());
+        }
+
+        if (skipBtn) {
+            skipBtn.addEventListener('click', () => this.skipTutorial());
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.skipTutorial());
+        }
+
+        this.tutorialListenersAttached = true;
+    }
+
+    updateTutorialStep() {
+        const step = this.tutorialSystem.steps[this.tutorialSystem.currentStep];
+        if (!step) return;
+
+        // Update progress
+        const progress = ((this.tutorialSystem.currentStep + 1) / this.tutorialSystem.steps.length) * 100;
+        const progressFill = document.getElementById('tutorialProgress');
+        const progressText = document.getElementById('progressText');
+
+        if (progressFill) progressFill.style.width = `${progress}%`;
+        if (progressText) {
+            progressText.textContent = `Step ${this.tutorialSystem.currentStep + 1} of ${this.tutorialSystem.steps.length}`;
+        }
+
+        // Update content
+        const title = document.getElementById('tutorialTitle');
+        const text = document.getElementById('tutorialText');
+        const visual = document.getElementById('tutorialVisual');
+
+        if (title) title.textContent = step.title;
+        if (text) text.textContent = step.text;
+
+        // Update visual
+        if (visual) {
+            if (typeof step.visual === 'string') {
+                visual.innerHTML = step.visual;
+                visual.className = 'tutorial-visual';
+            } else if (step.visual && step.visual.type === 'keys') {
+                visual.className = 'tutorial-visual demo-keys';
+                visual.innerHTML = step.visual.keys.map(key =>
+                    `<div class="demo-key">${key}</div>`
+                ).join('');
+            }
+        }
+
+        // Update highlight
+        this.updateTutorialHighlight(step.highlight);
+
+        // Update card position
+        const card = document.getElementById('tutorialCard');
+        if (card) {
+            card.className = 'tutorial-card';
+            if (step.position) {
+                card.classList.add(step.position);
+            }
+        }
+
+        // Update button states
+        const nextBtn = document.getElementById('tutorialNextBtn');
+        const prevBtn = document.getElementById('tutorialPrevBtn');
+
+        if (prevBtn) {
+            prevBtn.disabled = this.tutorialSystem.currentStep === 0;
+        }
+
+        if (nextBtn) {
+            if (this.tutorialSystem.currentStep === this.tutorialSystem.steps.length - 1) {
+                nextBtn.textContent = 'Finish';
+            } else {
+                nextBtn.textContent = 'Next';
+            }
+        }
+
+        // Handle special actions
+        if (step.action) {
+            this.handleTutorialAction(step.action);
+        }
+    }
+
+    updateTutorialHighlight(selector) {
+        const highlight = document.getElementById('tutorialHighlight');
+        if (!highlight) return;
+
+        if (!selector) {
+            highlight.style.display = 'none';
+            return;
+        }
+
+        const element = document.querySelector(selector);
+        if (!element) {
+            highlight.style.display = 'none';
+            return;
+        }
+
+        const rect = element.getBoundingClientRect();
+
+        // Position relative to the viewport (fixed positioning)
+        highlight.style.display = 'block';
+        highlight.style.position = 'fixed';
+        highlight.style.left = `${rect.left - 10}px`;
+        highlight.style.top = `${rect.top - 10}px`;
+        highlight.style.width = `${rect.width + 20}px`;
+        highlight.style.height = `${rect.height + 20}px`;
+        highlight.style.zIndex = '1150'; // Above overlay but below tutorial card
+    }
+
+    handleTutorialAction(action) {
+        switch (action) {
+            case 'waitForJump':
+                // Listen for jump input to advance
+                const originalJump = this.jump.bind(this);
+                this.jump = () => {
+                    originalJump();
+                    this.nextTutorialStep();
+                    this.jump = originalJump; // Restore original
+                };
+                break;
+        }
+    }
+
+    nextTutorialStep() {
+        if (this.tutorialSystem.currentStep < this.tutorialSystem.steps.length - 1) {
+            this.tutorialSystem.currentStep++;
+            this.updateTutorialStep();
+        } else {
+            this.completeTutorial();
+        }
+    }
+
+    prevTutorialStep() {
+        if (this.tutorialSystem.currentStep > 0) {
+            this.tutorialSystem.currentStep--;
+            this.updateTutorialStep();
+        }
+    }
+
+    skipTutorial() {
+        this.hideTutorialOverlay();
+    }
+
+    completeTutorial() {
+        const tutorialType = 'basic'; // Could be dynamic
+        this.tutorialSystem.completed[tutorialType] = true;
+        this.saveTutorialProgress();
+
+        // Show completion message
+        const completion = document.createElement('div');
+        completion.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            font-weight: bold;
+            z-index: 1400;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+        `;
+        completion.innerHTML = `
+            <h3 style="margin: 0 0 15px 0;">🎉 Tutorial Complete!</h3>
+            <p style="margin: 0;">You're ready to play Geometry Dash!</p>
+        `;
+        document.body.appendChild(completion);
+
+        setTimeout(() => {
+            if (document.body.contains(completion)) {
+                document.body.removeChild(completion);
+            }
+        }, 3000);
+
+        this.hideTutorialOverlay();
+    }
+
+    // === LEADERBOARD SYSTEM ===
+
+    loadPlayerName() {
+        try {
+            const stored = localStorage.getItem('geometryDash_playerName');
+            return stored || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    savePlayerName(name) {
+        try {
+            localStorage.setItem('geometryDash_playerName', name);
+            this.leaderboard.currentPlayer = name;
+        } catch (e) {
+            console.log('Could not save player name:', e);
+        }
+    }
+
+    loadLeaderboardData() {
+        try {
+            const stored = localStorage.getItem('geometryDash_leaderboard');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    saveLeaderboardData() {
+        try {
+            localStorage.setItem('geometryDash_leaderboard', JSON.stringify(this.leaderboard.scores));
+        } catch (e) {
+            console.log('Could not save leaderboard data:', e);
+        }
+    }
+
+    promptPlayerName() {
+        if (this.leaderboard.currentPlayer) {
+            return this.leaderboard.currentPlayer;
+        }
+
+        // Create name input modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 2px solid #00ff88;
+                border-radius: 15px;
+                padding: 30px;
+                text-align: center;
+                color: white;
+                max-width: 400px;
+                width: 90%;
+            ">
+                <h3 style="color: #00ff88; margin-bottom: 20px;">🏆 Join the Leaderboard!</h3>
+                <p style="margin-bottom: 20px;">Enter your name to track your achievements:</p>
+                <input type="text" id="playerNameInput" placeholder="Enter your name..." style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #00ff88;
+                    border-radius: 8px;
+                    background: rgba(0, 255, 136, 0.1);
+                    color: white;
+                    font-size: 1rem;
+                    margin-bottom: 20px;
+                    text-align: center;
+                " maxlength="20">
+                <div>
+                    <button id="saveNameBtn" style="
+                        background: linear-gradient(45deg, #00ff88, #00cc6a);
+                        color: #1a1a2e;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        margin-right: 10px;
+                    ">Save Name</button>
+                    <button id="skipNameBtn" style="
+                        background: transparent;
+                        color: #888;
+                        border: 1px solid #666;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                    ">Skip</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        return new Promise((resolve) => {
+            const input = modal.querySelector('#playerNameInput');
+            const saveBtn = modal.querySelector('#saveNameBtn');
+            const skipBtn = modal.querySelector('#skipNameBtn');
+
+            const handleSave = () => {
+                const name = input.value.trim();
+                if (name && name.length >= 2) {
+                    this.savePlayerName(name);
+                    document.body.removeChild(modal);
+                    resolve(name);
+                } else {
+                    input.style.borderColor = '#ff4444';
+                    input.placeholder = 'Name must be at least 2 characters';
+                }
+            };
+
+            const handleSkip = () => {
+                document.body.removeChild(modal);
+                resolve('Anonymous');
+            };
+
+            saveBtn.addEventListener('click', handleSave);
+            skipBtn.addEventListener('click', handleSkip);
+
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSave();
+                }
+            });
+
+            // Focus input
+            setTimeout(() => input.focus(), 100);
+        });
+    }
+
+    async recordCompletion(level, gameMode, attempts, timeElapsed, score) {
+        const playerName = this.leaderboard.currentPlayer || await this.promptPlayerName();
+
+        const completion = {
+            playerName: playerName,
+            level: level,
+            gameMode: gameMode,
+            attempts: attempts,
+            timeElapsed: timeElapsed,
+            score: score,
+            timestamp: Date.now(),
+            date: new Date().toLocaleDateString(),
+            difficulty: this.getLevelDifficulty(level)
+        };
+
+        // Check if this is a personal best
+        const existingRecord = this.leaderboard.scores.find(record =>
+            record.playerName === playerName &&
+            record.level === level &&
+            record.gameMode === gameMode
+        );
+
+        const isPersonalBest = !existingRecord ||
+            attempts < existingRecord.attempts ||
+            (attempts === existingRecord.attempts && timeElapsed < existingRecord.timeElapsed);
+
+        if (isPersonalBest) {
+            // Remove old record if it exists
+            if (existingRecord) {
+                const index = this.leaderboard.scores.indexOf(existingRecord);
+                this.leaderboard.scores.splice(index, 1);
+            }
+
+            // Add new record
+            this.leaderboard.scores.push(completion);
+            this.saveLeaderboardData();
+
+            // Show personal best notification
+            this.showPersonalBestNotification(completion, !existingRecord);
+        }
+
+        return isPersonalBest;
+    }
+
+    getLevelDifficulty(level) {
+        const difficulties = {
+            1: 'Easy',
+            2: 'Medium',
+            3: 'Hard',
+            4: 'Expert',
+            5: 'Insane',
+            'developer': 'Expert+',
+            'impossible': 'Nightmare'
+        };
+        return difficulties[level] || 'Unknown';
+    }
+
+    showPersonalBestNotification(completion, isFirstCompletion) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(255, 107, 53, 0.4);
+            z-index: 1600;
+            max-width: 300px;
+            animation: slideInBounce 0.6s ease-out;
+        `;
+
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 1.5rem; margin-right: 10px;">🏆</span>
+                <strong>${isFirstCompletion ? 'First Completion!' : 'Personal Best!'}</strong>
+            </div>
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                <div>${completion.playerName}</div>
+                <div>Level ${completion.level} - ${completion.gameMode}</div>
+                <div>${completion.attempts} attempts in ${(completion.timeElapsed / 1000).toFixed(1)}s</div>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Add bounce animation
+        if (!document.getElementById('leaderboard-animations')) {
+            const style = document.createElement('style');
+            style.id = 'leaderboard-animations';
+            style.textContent = `
+                @keyframes slideInBounce {
+                    0% { transform: translateX(100%) scale(0.8); opacity: 0; }
+                    60% { transform: translateX(-10px) scale(1.05); opacity: 1; }
+                    100% { transform: translateX(0) scale(1); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                notification.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, 4000);
+    }
+
+    getLeaderboardData(sortBy = 'score', filterLevel = null, filterMode = null) {
+        let filtered = [...this.leaderboard.scores];
+
+        // Apply filters
+        if (filterLevel) {
+            filtered = filtered.filter(record => record.level.toString() === filterLevel.toString());
+        }
+
+        if (filterMode && filterMode !== 'all') {
+            filtered = filtered.filter(record => record.gameMode === filterMode);
+        }
+
+        // Sort the data
+        filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'attempts':
+                    return a.attempts - b.attempts;
+                case 'time':
+                    return a.timeElapsed - b.timeElapsed;
+                case 'date':
+                    return b.timestamp - a.timestamp;
+                case 'score':
+                default:
+                    if (a.score !== b.score) return b.score - a.score;
+                    if (a.attempts !== b.attempts) return a.attempts - b.attempts;
+                    return a.timeElapsed - b.timeElapsed;
+            }
+        });
+
+        return filtered;
+    }
+
+    updateLeaderboard() {
+        const content = document.getElementById('leaderboardContent');
+        if (!content) return;
+
+        const levelFilter = document.getElementById('leaderboardLevel')?.value || null;
+        const modeFilter = document.getElementById('leaderboardMode')?.value || null;
+        const sortBy = document.getElementById('leaderboardSort')?.value || 'score';
+
+        const data = this.getLeaderboardData(sortBy, levelFilter, modeFilter);
+
+        if (data.length === 0) {
+            content.innerHTML = `
+                <div class="no-scores">
+                    <p>🎮 ${levelFilter || modeFilter ? 'No scores for these filters' : 'Complete some levels to see your scores'}!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'leaderboard-table';
+
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th class="leaderboard-rank">#</th>
+                    <th>Player</th>
+                    <th>Level</th>
+                    <th>Mode</th>
+                    <th>Score</th>
+                    <th>Attempts</th>
+                    <th>Time</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map((record, index) => {
+                    const rank = index + 1;
+                    let rankClass = '';
+                    if (rank === 1) rankClass = 'gold';
+                    else if (rank === 2) rankClass = 'silver';
+                    else if (rank === 3) rankClass = 'bronze';
+
+                    return `
+                        <tr>
+                            <td class="leaderboard-rank ${rankClass}">${rank}</td>
+                            <td class="leaderboard-name">${record.playerName}</td>
+                            <td class="leaderboard-level">Level ${record.level}</td>
+                            <td><span class="leaderboard-mode">${record.gameMode}</span></td>
+                            <td class="leaderboard-score">${record.score}</td>
+                            <td class="leaderboard-attempts">${record.attempts}</td>
+                            <td class="leaderboard-time">${(record.timeElapsed / 1000).toFixed(1)}s</td>
+                            <td>${record.date}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        `;
+
+        content.innerHTML = '';
+        content.appendChild(table);
+    }
+
+    setupLeaderboardListeners() {
+        if (this.leaderboardListenersAttached) return;
+
+        // Filter change listeners
+        const levelFilter = document.getElementById('leaderboardLevel');
+        const modeFilter = document.getElementById('leaderboardMode');
+        const sortFilter = document.getElementById('leaderboardSort');
+
+        if (levelFilter) {
+            levelFilter.addEventListener('change', () => this.updateLeaderboard());
+        }
+
+        if (modeFilter) {
+            modeFilter.addEventListener('change', () => this.updateLeaderboard());
+        }
+
+        if (sortFilter) {
+            sortFilter.addEventListener('change', () => this.updateLeaderboard());
+        }
+
+        // Action button listeners
+        const changeNameBtn = document.getElementById('changeNameBtn');
+        const clearBtn = document.getElementById('clearLeaderboardBtn');
+
+        if (changeNameBtn) {
+            changeNameBtn.addEventListener('click', () => {
+                this.leaderboard.currentPlayer = null;
+                this.promptPlayerName().then(() => {
+                    this.updateLeaderboard();
+                });
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all leaderboard data? This cannot be undone!')) {
+                    this.leaderboard.scores = [];
+                    this.saveLeaderboardData();
+                    this.updateLeaderboard();
+
+                    const confirmation = document.createElement('div');
+                    confirmation.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: #ff6666;
+                        color: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        font-weight: bold;
+                        z-index: 1700;
+                        text-align: center;
+                    `;
+                    confirmation.innerHTML = '🗑️ Leaderboard data cleared!';
+                    document.body.appendChild(confirmation);
+
+                    setTimeout(() => {
+                        if (document.body.contains(confirmation)) {
+                            document.body.removeChild(confirmation);
+                        }
+                    }, 2000);
+                }
+            });
+        }
+
+        this.leaderboardListenersAttached = true;
+    }
+
+    // === CUSTOM LEVEL UPLOAD SYSTEM ===
+
+    loadCustomLevels() {
+        try {
+            const stored = localStorage.getItem('geometryDash_customLevels');
+            return stored ? JSON.parse(stored) : {};
+        } catch (e) {
+            console.log('Could not load custom levels:', e);
+            return {};
+        }
+    }
+
+    saveCustomLevels() {
+        try {
+            localStorage.setItem('geometryDash_customLevels', JSON.stringify(this.customLevels.slots));
+        } catch (e) {
+            console.log('Could not save custom levels:', e);
+        }
+    }
+
+    showLevelUploadModal() {
+        const modal = document.createElement('div');
+        modal.id = 'levelUploadModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1600;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 2px solid #00ff88;
+                border-radius: 15px;
+                padding: 30px;
+                max-width: 600px;
+                width: 90%;
+                color: white;
+                max-height: 80vh;
+                overflow-y: auto;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: #00ff88; margin: 0;">📁 Upload Custom Level</h3>
+                    <button id="closeLevelUploadBtn" style="
+                        background: #ff4444;
+                        color: white;
+                        border: none;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        font-size: 1.2rem;
+                        cursor: pointer;
+                    ">×</button>
+                </div>
+
+                <div class="level-upload-content">
+                    <div class="upload-method-selector" style="margin-bottom: 20px;">
+                        <h4 style="color: #00ff88; margin-bottom: 15px;">Choose Upload Method:</h4>
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                            <button id="fileUploadBtn" class="upload-method-btn active" style="
+                                background: linear-gradient(45deg, #00ff88, #00cc6a);
+                                color: #1a1a2e;
+                                border: none;
+                                padding: 12px 20px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-weight: bold;
+                            ">📁 Upload File</button>
+                            <button id="jsonPasteBtn" class="upload-method-btn" style="
+                                background: rgba(0, 255, 136, 0.2);
+                                color: #00ff88;
+                                border: 1px solid #00ff88;
+                                padding: 12px 20px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-weight: bold;
+                            ">📋 Paste JSON</button>
+                        </div>
+                    </div>
+
+                    <div id="fileUploadSection" class="upload-section">
+                        <div style="
+                            border: 2px dashed #00ff88;
+                            border-radius: 10px;
+                            padding: 40px 20px;
+                            text-align: center;
+                            margin-bottom: 20px;
+                            background: rgba(0, 255, 136, 0.05);
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        " id="dropZone">
+                            <div style="font-size: 3rem; margin-bottom: 15px;">📁</div>
+                            <p style="margin: 0 0 10px 0; font-size: 1.1rem;">Drop your level file here</p>
+                            <p style="margin: 0; opacity: 0.7;">or click to browse</p>
+                            <input type="file" id="levelFileInput" accept=".json,.txt" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div id="jsonPasteSection" class="upload-section" style="display: none;">
+                        <textarea id="levelJsonInput" placeholder="Paste your level JSON here..." style="
+                            width: 100%;
+                            height: 200px;
+                            background: rgba(0, 255, 136, 0.1);
+                            border: 1px solid #00ff88;
+                            border-radius: 8px;
+                            padding: 15px;
+                            color: white;
+                            font-family: monospace;
+                            font-size: 0.9rem;
+                            resize: vertical;
+                            margin-bottom: 20px;
+                        "></textarea>
+                    </div>
+
+                    <div class="level-slot-selector" style="margin-bottom: 20px;">
+                        <h4 style="color: #00ff88; margin-bottom: 15px;">Select Level Slot:</h4>
+                        <div class="slot-grid" id="slotGrid" style="
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                            gap: 10px;
+                            margin-bottom: 20px;
+                        ">
+                            ${this.generateSlotButtons()}
+                        </div>
+                    </div>
+
+                    <div class="level-metadata" style="margin-bottom: 20px;">
+                        <h4 style="color: #00ff88; margin-bottom: 15px;">Level Information:</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #00ff88;">Level Name:</label>
+                                <input type="text" id="levelNameInput" placeholder="Enter level name..." style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 1px solid #00ff88;
+                                    border-radius: 6px;
+                                    background: rgba(0, 255, 136, 0.1);
+                                    color: white;
+                                " maxlength="30">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; color: #00ff88;">Author:</label>
+                                <input type="text" id="levelAuthorInput" placeholder="Level creator..." style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 1px solid #00ff88;
+                                    border-radius: 6px;
+                                    background: rgba(0, 255, 136, 0.1);
+                                    color: white;
+                                " maxlength="20">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: #00ff88;">Description (Optional):</label>
+                            <textarea id="levelDescriptionInput" placeholder="Describe your level..." style="
+                                width: 100%;
+                                padding: 10px;
+                                border: 1px solid #00ff88;
+                                border-radius: 6px;
+                                background: rgba(0, 255, 136, 0.1);
+                                color: white;
+                                resize: vertical;
+                                min-height: 60px;
+                                max-height: 120px;
+                            " maxlength="200"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="upload-actions" style="display: flex; gap: 15px; justify-content: center;">
+                        <button id="uploadLevelBtn" style="
+                            background: linear-gradient(45deg, #00ff88, #00cc6a);
+                            color: #1a1a2e;
+                            border: none;
+                            padding: 15px 30px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            font-size: 1.1rem;
+                        " disabled>Upload Level</button>
+                        <button id="cancelUploadBtn" style="
+                            background: transparent;
+                            color: #888;
+                            border: 1px solid #666;
+                            padding: 15px 30px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                        ">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        this.setupLevelUploadListeners(modal);
+    }
+
+    generateSlotButtons() {
+        let buttons = '';
+        for (let i = 1; i <= this.customLevels.maxSlots; i++) {
+            const slot = this.customLevels.slots[i];
+            const isOccupied = slot && slot.name;
+
+            buttons += `
+                <button class="slot-btn ${isOccupied ? 'occupied' : 'empty'}" data-slot="${i}" style="
+                    background: ${isOccupied ? 'rgba(255, 136, 0, 0.2)' : 'rgba(0, 255, 136, 0.1)'};
+                    border: 2px solid ${isOccupied ? '#ff8800' : '#00ff88'};
+                    border-radius: 8px;
+                    padding: 15px 10px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    color: white;
+                    text-align: center;
+                ">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Slot ${i}</div>
+                    <div style="font-size: 0.8rem; opacity: 0.8;">
+                        ${isOccupied ? slot.name : 'Empty'}
+                    </div>
+                </button>
+            `;
+        }
+        return buttons;
+    }
+
+    setupLevelUploadListeners(modal) {
+        const closeBtn = modal.querySelector('#closeLevelUploadBtn');
+        const cancelBtn = modal.querySelector('#cancelUploadBtn');
+        const fileUploadBtn = modal.querySelector('#fileUploadBtn');
+        const jsonPasteBtn = modal.querySelector('#jsonPasteBtn');
+        const fileInput = modal.querySelector('#levelFileInput');
+        const dropZone = modal.querySelector('#dropZone');
+        const uploadBtn = modal.querySelector('#uploadLevelBtn');
+
+        // Close modal handlers
+        const closeModal = () => {
+            document.body.removeChild(modal);
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        // Upload method switching
+        fileUploadBtn.addEventListener('click', () => {
+            this.switchUploadMethod('file', modal);
+        });
+
+        jsonPasteBtn.addEventListener('click', () => {
+            this.switchUploadMethod('json', modal);
+        });
+
+        // File upload handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#00cc6a';
+            dropZone.style.background = 'rgba(0, 255, 136, 0.1)';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#00ff88';
+            dropZone.style.background = 'rgba(0, 255, 136, 0.05)';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#00ff88';
+            dropZone.style.background = 'rgba(0, 255, 136, 0.05)';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFileUpload(files[0], modal);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileUpload(e.target.files[0], modal);
+            }
+        });
+
+        // Slot selection
+        modal.addEventListener('click', (e) => {
+            if (e.target.classList.contains('slot-btn') || e.target.parentElement.classList.contains('slot-btn')) {
+                const slotBtn = e.target.classList.contains('slot-btn') ? e.target : e.target.parentElement;
+                const slotNumber = parseInt(slotBtn.dataset.slot);
+                this.selectLevelSlot(slotNumber, modal);
+            }
+        });
+
+        // JSON input handler
+        const jsonInput = modal.querySelector('#levelJsonInput');
+        jsonInput.addEventListener('input', () => {
+            this.validateLevelData(modal);
+        });
+
+        // Upload button
+        uploadBtn.addEventListener('click', () => {
+            this.processLevelUpload(modal);
+        });
+
+        // Input validation
+        const nameInput = modal.querySelector('#levelNameInput');
+        nameInput.addEventListener('input', () => {
+            this.validateLevelData(modal);
+        });
+    }
+
+    switchUploadMethod(method, modal) {
+        const fileBtn = modal.querySelector('#fileUploadBtn');
+        const jsonBtn = modal.querySelector('#jsonPasteBtn');
+        const fileSection = modal.querySelector('#fileUploadSection');
+        const jsonSection = modal.querySelector('#jsonPasteSection');
+
+        if (method === 'file') {
+            fileBtn.style.background = 'linear-gradient(45deg, #00ff88, #00cc6a)';
+            fileBtn.style.color = '#1a1a2e';
+            jsonBtn.style.background = 'rgba(0, 255, 136, 0.2)';
+            jsonBtn.style.color = '#00ff88';
+            fileSection.style.display = 'block';
+            jsonSection.style.display = 'none';
+        } else {
+            jsonBtn.style.background = 'linear-gradient(45deg, #00ff88, #00cc6a)';
+            jsonBtn.style.color = '#1a1a2e';
+            fileBtn.style.background = 'rgba(0, 255, 136, 0.2)';
+            fileBtn.style.color = '#00ff88';
+            fileSection.style.display = 'none';
+            jsonSection.style.display = 'block';
+        }
+
+        this.validateLevelData(modal);
+    }
+
+    handleFileUpload(file, modal) {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const content = e.target.result;
+                const levelData = JSON.parse(content);
+
+                // Populate the JSON textarea with formatted content
+                const jsonInput = modal.querySelector('#levelJsonInput');
+                jsonInput.value = JSON.stringify(levelData, null, 2);
+
+                // Auto-fill metadata if available
+                const nameInput = modal.querySelector('#levelNameInput');
+                const authorInput = modal.querySelector('#levelAuthorInput');
+
+                if (levelData.name && !nameInput.value) {
+                    nameInput.value = levelData.name;
+                }
+
+                if (levelData.author && !authorInput.value) {
+                    authorInput.value = levelData.author;
+                }
+
+                this.validateLevelData(modal);
+
+            } catch (error) {
+                this.showUploadError('Invalid JSON file. Please check the format and try again.');
+            }
+        };
+
+        reader.onerror = () => {
+            this.showUploadError('Failed to read file. Please try again.');
+        };
+
+        reader.readAsText(file);
+    }
+
+    selectLevelSlot(slotNumber, modal) {
+        this.customLevels.currentSlot = slotNumber;
+
+        // Update slot button styling
+        const slotButtons = modal.querySelectorAll('.slot-btn');
+        slotButtons.forEach(btn => {
+            btn.style.transform = 'scale(1)';
+            btn.style.boxShadow = 'none';
+        });
+
+        const selectedBtn = modal.querySelector(`[data-slot="${slotNumber}"]`);
+        selectedBtn.style.transform = 'scale(1.05)';
+        selectedBtn.style.boxShadow = '0 0 15px rgba(0, 255, 136, 0.5)';
+
+        this.validateLevelData(modal);
+    }
+
+    validateLevelData(modal) {
+        const jsonInput = modal.querySelector('#levelJsonInput');
+        const nameInput = modal.querySelector('#levelNameInput');
+        const uploadBtn = modal.querySelector('#uploadLevelBtn');
+
+        let isValid = true;
+        let levelData = null;
+        let validationErrors = [];
+
+        // Check if slot is selected
+        if (!this.customLevels.currentSlot) {
+            isValid = false;
+            validationErrors.push('No slot selected');
+        }
+
+        // Check if name is provided
+        if (!nameInput.value.trim()) {
+            isValid = false;
+            validationErrors.push('Level name is required');
+        }
+
+        // Validate JSON data
+        try {
+            if (jsonInput.value.trim()) {
+                levelData = JSON.parse(jsonInput.value);
+
+                // Basic level data validation
+                if (!this.isValidLevelData(levelData)) {
+                    isValid = false;
+                    validationErrors.push('Invalid level data structure');
+                }
+            } else {
+                isValid = false;
+                validationErrors.push('JSON data is required');
+            }
+        } catch (e) {
+            isValid = false;
+            validationErrors.push('Invalid JSON format');
+        }
+
+        // Debug logging
+        console.log('Validation check:', {
+            isValid,
+            currentSlot: this.customLevels.currentSlot,
+            levelName: nameInput.value.trim(),
+            hasJsonData: !!jsonInput.value.trim(),
+            validationErrors
+        });
+
+        // Update upload button state
+        uploadBtn.disabled = !isValid;
+        uploadBtn.style.opacity = isValid ? '1' : '0.5';
+
+        if (!isValid) {
+            uploadBtn.title = 'Validation errors: ' + validationErrors.join(', ');
+        } else {
+            uploadBtn.title = 'Upload level';
+        }
+
+        return { isValid, levelData };
+    }
+
+    isValidLevelData(data) {
+        // Check for required properties
+        if (!data || typeof data !== 'object') return false;
+
+        // Level should have sections or obstacles
+        if (!data.sections && !data.obstacles && !data.template) return false;
+
+        // If it has sections, validate structure
+        if (data.sections && Array.isArray(data.sections)) {
+            for (const section of data.sections) {
+                if (!section.x || typeof section.x !== 'number') return false;
+                if (!section.length || typeof section.length !== 'number') return false;
+            }
+        }
+
+        return true;
+    }
+
+    processLevelUpload(modal) {
+        const validation = this.validateLevelData(modal);
+
+        if (!validation.isValid) {
+            this.showUploadError('Please fix validation errors before uploading.');
+            return;
+        }
+
+        const nameInput = modal.querySelector('#levelNameInput');
+        const authorInput = modal.querySelector('#levelAuthorInput');
+
+        const levelInfo = {
+            data: validation.levelData,
+            metadata: {
+                name: nameInput.value.trim(),
+                description: modal.querySelector('#levelDescriptionInput')?.value.trim() || '',
+                author: authorInput.value.trim() || 'Unknown',
+                difficulty: this.analyzeLevelDifficulty(validation.levelData),
+                dateAdded: Date.now(),
+                playCount: 0,
+                bestScore: 0,
+                rating: 0
+            }
+        };
+
+        // Save to slot
+        this.customLevels.slots[this.customLevels.currentSlot] = levelInfo;
+        this.saveCustomLevels();
+
+        // Show success message
+        this.showUploadSuccess(levelInfo.metadata.name, this.customLevels.currentSlot);
+
+        // Close modal
+        document.body.removeChild(modal);
+
+        // Update level selector if needed
+        this.updateLevelSelector();
+
+        // Refresh User Levels page if it's currently open
+        const userLevelsPage = document.getElementById('userLevelsPage');
+        if (userLevelsPage && userLevelsPage.style.display === 'block') {
+            this.renderUserLevels();
+        }
+    }
+
+    analyzeLevelDifficulty(levelData) {
+        // Simple difficulty analysis based on level content
+        let difficulty = 'Easy';
+
+        if (levelData.sections) {
+            const totalLength = levelData.sections.reduce((sum, section) => sum + section.length, 0);
+            const obstacleCount = levelData.sections.filter(section =>
+                section.obstacles && section.obstacles.length > 0
+            ).length;
+
+            const density = obstacleCount / Math.max(totalLength / 100, 1);
+
+            if (density > 0.8) difficulty = 'Insane';
+            else if (density > 0.6) difficulty = 'Expert';
+            else if (density > 0.4) difficulty = 'Hard';
+            else if (density > 0.2) difficulty = 'Medium';
+        }
+
+        return difficulty;
+    }
+
+    showUploadError(message) {
+        const error = document.createElement('div');
+        error.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff4444, #cc3333);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 1700;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+        `;
+        error.innerHTML = `❌ ${message}`;
+        document.body.appendChild(error);
+
+        setTimeout(() => {
+            if (document.body.contains(error)) {
+                document.body.removeChild(error);
+            }
+        }, 4000);
+    }
+
+    showUploadSuccess(levelName, slotNumber) {
+        const success = document.createElement('div');
+        success.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #1a1a2e;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 1700;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            font-weight: bold;
+        `;
+        success.innerHTML = `✅ "${levelName}" uploaded to Slot ${slotNumber}!`;
+        document.body.appendChild(success);
+
+        setTimeout(() => {
+            if (document.body.contains(success)) {
+                document.body.removeChild(success);
+            }
+        }, 4000);
+    }
+
+    updateLevelSelector() {
+        const levelSelect = document.getElementById('levelSelect');
+        if (!levelSelect) return;
+
+        // Remove existing custom level options
+        const existingCustomOptions = levelSelect.querySelectorAll('.custom-level-option');
+        existingCustomOptions.forEach(option => option.remove());
+
+        // Add custom level options
+        for (let i = 1; i <= this.customLevels.maxSlots; i++) {
+            const slot = this.customLevels.slots[i];
+            if (slot && slot.name) {
+                const option = document.createElement('option');
+                option.value = `custom_${i}`;
+                option.textContent = `${slot.name} (${slot.author})`;
+                option.className = 'custom-level-option';
+                option.style.fontStyle = 'italic';
+                levelSelect.appendChild(option);
+            }
+        }
+    }
+
+    loadUploadedLevel(slotNumber) {
+        const slot = this.customLevels.slots[slotNumber];
+        if (!slot || !slot.data) {
+            this.showUploadError(`No level found in slot ${slotNumber}`);
+            return;
+        }
+
+        try {
+            // Set up custom level state
+            this.currentLevel = `custom_${slotNumber}`;
+            this.isCustomLevel = true;
+            this.customLevelData = slot.data;
+
+            // Update UI
+            document.getElementById('currentLevel').textContent = slot.name;
+
+            // Increment play count
+            slot.playCount = (slot.playCount || 0) + 1;
+            this.saveCustomLevels();
+
+            // Generate the level
+            this.generateLevel();
+
+            // Show level info notification
+            this.showLevelInfo(slot);
+
+        } catch (error) {
+            console.error('Error loading custom level:', error);
+            this.showUploadError('Failed to load custom level. The level data may be corrupted.');
+
+            // Reset to default level
+            document.getElementById('levelSelect').value = '1';
+            this.currentLevel = 1;
+            this.isCustomLevel = false;
+            this.customLevelData = null;
+            this.generateLevel();
+            document.getElementById('currentLevel').textContent = '1';
+        }
+    }
+
+    showLevelInfo(levelSlot) {
+        const info = document.createElement('div');
+        info.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            z-index: 1700;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            text-align: center;
+            max-width: 400px;
+        `;
+
+        info.innerHTML = `
+            <h4 style="color: #00ff88; margin: 0 0 15px 0;">${levelSlot.name}</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div>
+                    <strong style="color: #00ff88;">Author:</strong><br>
+                    ${levelSlot.author}
+                </div>
+                <div>
+                    <strong style="color: #00ff88;">Difficulty:</strong><br>
+                    ${levelSlot.difficulty}
+                </div>
+                <div>
+                    <strong style="color: #00ff88;">Uploaded:</strong><br>
+                    ${new Date(levelSlot.uploadDate).toLocaleDateString()}
+                </div>
+                <div>
+                    <strong style="color: #00ff88;">Play Count:</strong><br>
+                    ${levelSlot.playCount}
+                </div>
+            </div>
+            <p style="margin: 0; opacity: 0.8; font-size: 0.9rem;">Good luck! 🎮</p>
+        `;
+
+        document.body.appendChild(info);
+
+        setTimeout(() => {
+            if (document.body.contains(info)) {
+                info.style.transition = 'opacity 0.3s ease';
+                info.style.opacity = '0';
+                setTimeout(() => {
+                    if (document.body.contains(info)) {
+                        document.body.removeChild(info);
+                    }
+                }, 300);
+            }
+        }, 4000);
+    }
+
     restartGame() {
         this.attempts++;
         document.getElementById('attempts').textContent = this.attempts;
+
+        // Record level start time for leaderboard timing
+        this.levelStartTime = Date.now();
 
         // Reset game mode to starting mode for mixed levels
         if (this.gameMode === 'mixed') {
@@ -3991,6 +6135,416 @@ class GeometryDash {
         this.update();
         this.render();
         requestAnimationFrame((time) => this.gameLoop(time));
+    }
+
+    showHelpMenu() {
+        console.log('Showing help menu');
+        const helpMenu = document.getElementById('helpMenu');
+        if (helpMenu) {
+            helpMenu.style.display = 'flex';
+
+            // Update analytics dashboard when help menu is shown
+            this.updateAnalyticsDashboard();
+
+            // Update leaderboard when help menu is shown
+            this.updateLeaderboard();
+
+            // Set up event listeners (only once)
+            if (!this.analyticsListenersAttached) {
+                const resetBtn = document.getElementById('resetAnalyticsBtn');
+                const exportBtn = document.getElementById('exportAnalyticsBtn');
+
+                if (resetBtn) {
+                    resetBtn.addEventListener('click', () => {
+                        this.resetAnalytics();
+                    });
+                }
+
+                if (exportBtn) {
+                    exportBtn.addEventListener('click', () => {
+                        this.exportAnalytics();
+                    });
+                }
+
+                this.analyticsListenersAttached = true;
+            }
+
+            // Set up leaderboard listeners (only once)
+            this.setupLeaderboardListeners();
+
+            console.log('Help menu displayed');
+        } else {
+            console.error('Help menu element not found');
+        }
+    }
+
+    hideHelpMenu() {
+        console.log('Hiding help menu');
+        const helpMenu = document.getElementById('helpMenu');
+        if (helpMenu) {
+            helpMenu.style.display = 'none';
+            console.log('Help menu hidden');
+        } else {
+            console.error('Help menu element not found');
+        }
+    }
+
+    // User Levels Page Methods
+    showUserLevelsPage() {
+        console.log('Showing User Levels page');
+        const userLevelsPage = document.getElementById('userLevelsPage');
+        if (userLevelsPage) {
+            userLevelsPage.style.display = 'block';
+            this.renderUserLevels();
+            this.setupUserLevelsEventListeners();
+        } else {
+            console.error('User Levels page element not found');
+        }
+    }
+
+    hideUserLevelsPage() {
+        console.log('Hiding User Levels page');
+        const userLevelsPage = document.getElementById('userLevelsPage');
+        if (userLevelsPage) {
+            userLevelsPage.style.display = 'none';
+        }
+    }
+
+    setupUserLevelsEventListeners() {
+        // Back to hub button
+        const backToHubBtn = document.getElementById('backToHubBtn');
+        if (backToHubBtn) {
+            backToHubBtn.replaceWith(backToHubBtn.cloneNode(true));
+            const newBackBtn = document.getElementById('backToHubBtn');
+            newBackBtn.addEventListener('click', () => {
+                this.hideUserLevelsPage();
+            });
+        }
+
+        // Upload buttons
+        const uploadLevelPageBtn = document.getElementById('uploadLevelPageBtn');
+        const uploadFirstLevelBtn = document.getElementById('uploadFirstLevelBtn');
+
+        [uploadLevelPageBtn, uploadFirstLevelBtn].forEach(btn => {
+            if (btn) {
+                btn.replaceWith(btn.cloneNode(true));
+                const newBtn = document.getElementById(btn.id);
+                newBtn.addEventListener('click', () => {
+                    this.showLevelUploadModal();
+                });
+            }
+        });
+
+        // Sort dropdown
+        const levelsSortSelect = document.getElementById('levelsSortSelect');
+        if (levelsSortSelect) {
+            levelsSortSelect.replaceWith(levelsSortSelect.cloneNode(true));
+            const newSortSelect = document.getElementById('levelsSortSelect');
+            newSortSelect.addEventListener('change', () => {
+                this.renderUserLevels();
+            });
+        }
+    }
+
+    renderUserLevels() {
+        const levelsGrid = document.getElementById('levelsGrid');
+        const emptyState = document.getElementById('emptyLevelsState');
+
+        if (!levelsGrid || !emptyState) return;
+
+        const customLevels = this.getCustomLevelsForDisplay();
+
+        if (customLevels.length === 0) {
+            emptyState.style.display = 'block';
+            levelsGrid.innerHTML = '';
+            levelsGrid.appendChild(emptyState);
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        // Sort levels
+        const sortBy = document.getElementById('levelsSortSelect')?.value || 'date';
+        customLevels.sort((a, b) => {
+            switch (sortBy) {
+                case 'name':
+                    return (a.metadata?.name || `Custom Level ${a.slot}`).localeCompare(b.metadata?.name || `Custom Level ${b.slot}`);
+                case 'rating':
+                    return (b.metadata?.rating || 0) - (a.metadata?.rating || 0);
+                case 'difficulty':
+                    return (a.metadata?.difficulty || 1) - (b.metadata?.difficulty || 1);
+                case 'date':
+                default:
+                    return new Date(b.metadata?.dateAdded || 0) - new Date(a.metadata?.dateAdded || 0);
+            }
+        });
+
+        levelsGrid.innerHTML = customLevels.map(level => this.createLevelCard(level)).join('');
+
+        // Add event listeners to level cards
+        this.setupLevelCardEventListeners();
+    }
+
+    getCustomLevelsForDisplay() {
+        const levels = [];
+        for (let slot = 1; slot <= this.customLevels.maxSlots; slot++) {
+            const levelData = this.customLevels.slots[slot];
+            if (levelData) {
+                levels.push({
+                    slot: slot,
+                    data: levelData.data,
+                    metadata: levelData.metadata
+                });
+            }
+        }
+        return levels;
+    }
+
+    createLevelCard(level) {
+        const metadata = level.metadata || {};
+        const name = metadata.name || `Custom Level ${level.slot}`;
+        const description = metadata.description || 'No description provided';
+        const author = metadata.author || 'Unknown';
+        const difficulty = this.getDifficultyName(metadata.difficulty || 1);
+        const rating = metadata.rating || 0;
+        const dateAdded = new Date(metadata.dateAdded || Date.now()).toLocaleDateString();
+        const playCount = metadata.playCount || 0;
+        const bestScore = metadata.bestScore || 0;
+
+        return `
+            <div class="level-card" data-slot="${level.slot}">
+                <div class="level-card-header">
+                    <div class="level-card-title">${this.escapeHtml(name)}</div>
+                    <div class="level-card-meta">
+                        <span>Slot ${level.slot}</span>
+                        <span class="level-difficulty difficulty-${difficulty.toLowerCase()}">${difficulty}</span>
+                    </div>
+                </div>
+                <div class="level-card-body">
+                    <div class="level-description">${this.escapeHtml(description)}</div>
+                    <div class="level-stats">
+                        <div class="level-stat"><strong>Author:</strong> ${this.escapeHtml(author)}</div>
+                        <div class="level-stat"><strong>Added:</strong> ${dateAdded}</div>
+                        <div class="level-stat"><strong>Plays:</strong> ${playCount}</div>
+                        <div class="level-stat"><strong>Best Score:</strong> ${bestScore}</div>
+                    </div>
+                    <div class="star-rating">
+                        <div class="star-rating-display star-rating-interactive" data-slot="${level.slot}">
+                            ${this.createStarRating(rating)}
+                        </div>
+                        <span class="rating-text">${rating.toFixed(1)} / 5.0</span>
+                    </div>
+                    <div class="level-card-actions">
+                        <button class="level-action-btn play-btn" data-action="play" data-slot="${level.slot}">Play</button>
+                        <button class="level-action-btn edit-btn" data-action="edit" data-slot="${level.slot}">Edit</button>
+                        <button class="level-action-btn duplicate-btn" data-action="duplicate" data-slot="${level.slot}">Copy</button>
+                        <button class="level-action-btn delete-btn" data-action="delete" data-slot="${level.slot}">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    createStarRating(rating) {
+        let stars = '';
+        for (let i = 1; i <= 5; i++) {
+            const filled = i <= Math.round(rating) ? 'filled' : '';
+            stars += `<span class="star ${filled}" data-rating="${i}">★</span>`;
+        }
+        return stars;
+    }
+
+    getDifficultyName(difficulty) {
+        switch (difficulty) {
+            case 1: return 'Easy';
+            case 2: return 'Medium';
+            case 3: return 'Hard';
+            case 4: return 'Expert';
+            case 5: return 'Insane';
+            default: return 'Medium';
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    setupLevelCardEventListeners() {
+        // Star rating interactions
+        document.querySelectorAll('.star-rating-interactive .star').forEach(star => {
+            star.addEventListener('click', (e) => {
+                const slot = parseInt(e.target.closest('.star-rating-display').dataset.slot);
+                const rating = parseInt(e.target.dataset.rating);
+                this.setLevelRating(slot, rating);
+            });
+
+            star.addEventListener('mouseenter', (e) => {
+                const rating = parseInt(e.target.dataset.rating);
+                const stars = e.target.closest('.star-rating-display').querySelectorAll('.star');
+                stars.forEach((s, index) => {
+                    s.classList.toggle('filled', index < rating);
+                });
+            });
+
+            star.addEventListener('mouseleave', (e) => {
+                const slot = parseInt(e.target.closest('.star-rating-display').dataset.slot);
+                const levelData = this.customLevels.slots[slot];
+                const currentRating = levelData?.metadata?.rating || 0;
+                const stars = e.target.closest('.star-rating-display').querySelectorAll('.star');
+                stars.forEach((s, index) => {
+                    s.classList.toggle('filled', index < Math.round(currentRating));
+                });
+            });
+        });
+
+        // Level action buttons
+        document.querySelectorAll('.level-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const action = e.target.dataset.action;
+                const slot = parseInt(e.target.dataset.slot);
+                this.handleLevelAction(action, slot);
+            });
+        });
+    }
+
+    setLevelRating(slot, rating) {
+        const levelData = this.customLevels.slots[slot];
+        if (levelData) {
+            levelData.metadata.rating = rating;
+            this.saveCustomLevels();
+
+            // Update the rating display
+            const ratingText = document.querySelector(`[data-slot="${slot}"] .rating-text`);
+            if (ratingText) {
+                ratingText.textContent = `${rating.toFixed(1)} / 5.0`;
+            }
+
+            console.log(`Set rating for slot ${slot} to ${rating} stars`);
+        }
+    }
+
+    handleLevelAction(action, slot) {
+        switch (action) {
+            case 'play':
+                this.playCustomLevel(slot);
+                break;
+            case 'edit':
+                this.editCustomLevel(slot);
+                break;
+            case 'duplicate':
+                this.duplicateCustomLevel(slot);
+                break;
+            case 'delete':
+                this.deleteCustomLevel(slot);
+                break;
+        }
+    }
+
+    playCustomLevel(slot) {
+        console.log(`Playing custom level from slot ${slot}`);
+        this.hideUserLevelsPage();
+        this.loadUploadedLevel(slot);
+        this.startGame();
+    }
+
+    editCustomLevel(slot) {
+        console.log(`Editing custom level from slot ${slot}`);
+        // Load level into editor - reuse existing editor functionality
+        const levelData = this.customLevels.slots[slot];
+        if (levelData) {
+            localStorage.setItem('customLevel', JSON.stringify(levelData.data));
+            window.location.href = window.location.pathname + '?custom=true';
+        }
+    }
+
+    duplicateCustomLevel(slot) {
+        console.log(`Duplicating custom level from slot ${slot}`);
+        const sourceLevel = this.customLevels.slots[slot];
+        if (!sourceLevel) return;
+
+        // Find next available slot
+        let targetSlot = null;
+        for (let i = 1; i <= this.customLevels.maxSlots; i++) {
+            if (!this.customLevels.slots[i]) {
+                targetSlot = i;
+                break;
+            }
+        }
+
+        if (targetSlot) {
+            const duplicatedLevel = {
+                data: JSON.parse(JSON.stringify(sourceLevel.data)),
+                metadata: {
+                    ...sourceLevel.metadata,
+                    name: (sourceLevel.metadata.name || `Custom Level ${slot}`) + ' (Copy)',
+                    dateAdded: Date.now(),
+                    playCount: 0,
+                    bestScore: 0,
+                    rating: 0
+                }
+            };
+
+            this.customLevels.slots[targetSlot] = duplicatedLevel;
+            this.saveCustomLevels();
+            this.renderUserLevels();
+
+            alert(`Level duplicated to slot ${targetSlot}!`);
+        } else {
+            alert('No available slots for duplication. Please delete a level first.');
+        }
+    }
+
+    deleteCustomLevel(slot) {
+        const levelData = this.customLevels.slots[slot];
+        if (!levelData) return;
+
+        const levelName = levelData.metadata?.name || `Custom Level ${slot}`;
+        if (confirm(`Are you sure you want to delete "${levelName}"? This action cannot be undone.`)) {
+            delete this.customLevels.slots[slot];
+            this.saveCustomLevels();
+            this.updateLevelSelector();
+            this.renderUserLevels();
+            console.log(`Deleted custom level from slot ${slot}`);
+        }
+    }
+
+    // Enhanced custom level data structure with ratings
+    loadCustomLevels() {
+        try {
+            const savedLevels = localStorage.getItem('customLevels');
+            if (savedLevels) {
+                const parsed = JSON.parse(savedLevels);
+                // Ensure metadata exists for each level
+                Object.keys(parsed).forEach(slot => {
+                    if (parsed[slot] && !parsed[slot].metadata) {
+                        parsed[slot].metadata = {
+                            name: `Custom Level ${slot}`,
+                            description: '',
+                            author: '',
+                            difficulty: 1,
+                            dateAdded: Date.now(),
+                            playCount: 0,
+                            bestScore: 0,
+                            rating: 0
+                        };
+                    }
+                });
+                return parsed;
+            }
+        } catch (e) {
+            console.error('Error loading custom levels:', e);
+        }
+        return {};
+    }
+
+    saveCustomLevels() {
+        try {
+            localStorage.setItem('customLevels', JSON.stringify(this.customLevels.slots));
+        } catch (e) {
+            console.error('Error saving custom levels:', e);
+        }
     }
 }
 
