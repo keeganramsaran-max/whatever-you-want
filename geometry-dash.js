@@ -1179,6 +1179,11 @@ class GeometryDash {
         this.finishPortals = [];
         this.speed = this.baseSpeed;
 
+        // Add a test jump pad for debugging
+        impossibleLevelData.objects.push({
+            x: 800, y: 305, width: 50, height: 15, type: 'jump-pad', rotation: 0
+        });
+
         // Store the level data for loading
         this.customLevelData = impossibleLevelData;
         this.isCustomLevel = true;
@@ -1271,10 +1276,16 @@ class GeometryDash {
         const type = Math.random();
         const difficultyMultiplier = this.getDifficultyMultiplier(difficulty);
 
-        if (type < 0.4 * difficultyMultiplier) {
+        if (type < 0.3 * difficultyMultiplier) {
             this.obstacles.push({
                 x: x, y: this.canvas.height - 50 - 40,
                 width: 40, height: 40, type: 'spike'
+            });
+        } else if (type < 0.5) {
+            // Add jump pads occasionally
+            this.obstacles.push({
+                x: x, y: this.canvas.height - 50 - 15,
+                width: 50, height: 15, type: 'jump-pad'
             });
         } else if (type < 0.7) {
             const platformHeight = 60 + Math.random() * (80 * difficultyMultiplier);
@@ -1619,11 +1630,17 @@ class GeometryDash {
 
             if (mode === 'cube') {
                 console.log('Cube mode: generating obstacles at x:', x);
-                if (type < 0.4) {
+                if (type < 0.3) {
                     console.log('Adding cube spike');
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
                         width: 40, height: 40, type: 'spike'
+                    });
+                } else if (type < 0.5) {
+                    console.log('Adding jump pad');
+                    this.obstacles.push({
+                        x: x, y: this.canvas.height - 50 - 15,
+                        width: 50, height: 15, type: 'jump-pad'
                     });
                 } else if (type < 0.7) {
                     console.log('Adding cube platform (raised)');
@@ -2021,6 +2038,43 @@ class GeometryDash {
                         continue;
                     }
                 }
+            } else if (obstacle.type === 'jump-pad') {
+                // Jump pad collision detection - simplified for more reliable activation
+                if (this.player.x < obstacle.x + obstacle.width &&
+                    this.player.x + this.player.width > obstacle.x &&
+                    this.player.y < obstacle.y + obstacle.height &&
+                    this.player.y + this.player.height > obstacle.y) {
+
+                    console.log('Jump pad collision detected!');
+                    const playerBottom = this.player.y + this.player.height;
+                    const padTop = obstacle.y;
+
+                    console.log(`Player velocity: ${this.player.velocity}, playerBottom: ${playerBottom}, padTop: ${padTop}`);
+
+                    // Check if player is touching the top surface of the jump pad
+                    if (playerBottom >= padTop && playerBottom <= padTop + 10) {
+                        console.log('Jump pad activated!');
+                        this.player.y = padTop - this.player.height;
+                        this.player.velocity = -this.player.jumpPower; // Same boost as cube jump
+                        this.player.onGround = false;
+                        this.playSound('jump');
+
+                        // Add visual particles for jump pad activation
+                        for (let i = 0; i < 10; i++) {
+                            this.particles.push({
+                                x: obstacle.x + obstacle.width / 2 + (Math.random() - 0.5) * obstacle.width,
+                                y: obstacle.y,
+                                vx: (Math.random() - 0.5) * 8,
+                                vy: -Math.random() * 8 - 2,
+                                life: 30,
+                                color: '#00ff00'
+                            });
+                        }
+                        continue;
+                    } else {
+                        console.log(`Jump pad collision but not on top surface. PlayerBottom: ${playerBottom}, PadTop: ${padTop}`);
+                    }
+                }
             } else {
                 // Check for spike collision (triangular)
                 if (obstacle.type === 'spike' || obstacle.type === 'spike-up') {
@@ -2095,6 +2149,73 @@ class GeometryDash {
 
                             this.player.y = platformBottom;
                             this.player.velocity = Math.abs(this.player.velocity) * 0.7;
+                            continue;
+                        }
+                    }
+                }
+            } else if (obstacle.type === 'jump-pad') {
+                // Jump pad collision detection for ball mode
+                if (this.player.x < obstacle.x + obstacle.width &&
+                    this.player.x + this.player.width > obstacle.x &&
+                    this.player.y < obstacle.y + obstacle.height &&
+                    this.player.y + this.player.height > obstacle.y) {
+
+                    if (this.player.gravityDirection > 0) {
+                        const playerBottom = this.player.y + this.player.height;
+                        const playerPrevBottom = playerBottom - this.player.velocity;
+                        const padTop = obstacle.y;
+
+                        // Only activate when landing on top of the jump pad
+                        if (this.player.velocity > 0 &&
+                            playerPrevBottom <= padTop &&
+                            playerBottom >= padTop &&
+                            this.player.x + this.player.width > obstacle.x + 5 &&
+                            this.player.x < obstacle.x + obstacle.width - 5) {
+
+                            this.player.y = padTop - this.player.height;
+                            this.player.velocity = -this.player.jumpPower; // Same boost as cube jump
+                            this.playSound('jump');
+
+                            // Add visual particles
+                            for (let i = 0; i < 10; i++) {
+                                this.particles.push({
+                                    x: obstacle.x + obstacle.width / 2 + (Math.random() - 0.5) * obstacle.width,
+                                    y: obstacle.y,
+                                    vx: (Math.random() - 0.5) * 8,
+                                    vy: -Math.random() * 8 - 2,
+                                    life: 30,
+                                    color: '#00ff00'
+                                });
+                            }
+                            continue;
+                        }
+                    } else {
+                        const playerTop = this.player.y;
+                        const playerPrevTop = playerTop - this.player.velocity;
+                        const padBottom = obstacle.y + obstacle.height;
+
+                        // Activate when hitting bottom of jump pad (inverted gravity)
+                        if (this.player.velocity < 0 &&
+                            playerPrevTop >= padBottom &&
+                            playerTop <= padBottom &&
+                            this.player.x + this.player.width > obstacle.x + 5 &&
+                            this.player.x < obstacle.x + obstacle.width - 5) {
+
+                            this.player.y = padBottom;
+                            this.player.velocity = this.player.jumpPower; // Boost in opposite direction for inverted gravity
+                            this.playSound('jump');
+
+                            // Add visual particles
+                            for (let i = 0; i < 10; i++) {
+                                this.particles.push({
+                                    x: obstacle.x + obstacle.width / 2 + (Math.random() - 0.5) * obstacle.width,
+                                    y: obstacle.y + obstacle.height,
+                                    vx: (Math.random() - 0.5) * 8,
+                                    vy: Math.random() * 8 + 2,
+                                    life: 30,
+                                    color: '#00ff00'
+                                });
+                            }
                             continue;
                         }
                     }
@@ -2209,6 +2330,39 @@ class GeometryDash {
                         } else if (mode === 'ship') {
                             this.player.shipVelocity = 0;
                         }
+                    }
+                    continue;
+                }
+            } else if (obstacle.type === 'jump-pad') {
+                // Jump pad collision detection for wave/ship modes
+                if (this.checkHitboxCollision(playerHitbox, {
+                    x: obstacle.x,
+                    y: obstacle.y,
+                    width: obstacle.width,
+                    height: obstacle.height
+                })) {
+                    const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+
+                    if (mode === 'wave') {
+                        // Boost wave's vertical velocity
+                        this.player.waveVelocity = -this.player.jumpPower * 0.8; // Slightly reduced for wave mode
+                    } else if (mode === 'ship') {
+                        // Boost ship's vertical velocity
+                        this.player.shipVelocity = -this.player.jumpPower * 0.8; // Slightly reduced for ship mode
+                    }
+
+                    this.playSound('jump');
+
+                    // Add visual particles
+                    for (let i = 0; i < 10; i++) {
+                        this.particles.push({
+                            x: obstacle.x + obstacle.width / 2 + (Math.random() - 0.5) * obstacle.width,
+                            y: obstacle.y,
+                            vx: (Math.random() - 0.5) * 8,
+                            vy: -Math.random() * 8 - 2,
+                            life: 30,
+                            color: '#00ff00'
+                        });
                     }
                     continue;
                 }
@@ -2500,6 +2654,30 @@ class GeometryDash {
             } else if (obstacle.type === 'slope-up' || obstacle.type === 'slope-down' ||
                        obstacle.type === 'steep-up' || obstacle.type === 'steep-down') {
                 this.drawSlopedObstacle(obstacle);
+            } else if (obstacle.type === 'jump-pad') {
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+                // Draw upward arrow to indicate jump boost
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                const centerX = obstacle.x + obstacle.width / 2;
+                const centerY = obstacle.y + obstacle.height / 2;
+                const arrowSize = Math.min(obstacle.width, obstacle.height) * 0.3;
+
+                // Arrow body
+                this.ctx.fillRect(centerX - arrowSize * 0.2, centerY - arrowSize * 0.5, arrowSize * 0.4, arrowSize);
+
+                // Arrow head
+                this.ctx.moveTo(centerX, centerY - arrowSize * 0.7);
+                this.ctx.lineTo(centerX - arrowSize * 0.5, centerY - arrowSize * 0.1);
+                this.ctx.lineTo(centerX + arrowSize * 0.5, centerY - arrowSize * 0.1);
+                this.ctx.closePath();
+                this.ctx.fill();
             }
 
             // Restore rotation if applied

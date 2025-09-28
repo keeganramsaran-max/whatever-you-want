@@ -570,6 +570,28 @@ class LevelEditor {
                     this.ctx.strokeStyle = '#4CAF50';
                     this.ctx.lineWidth = 2;
                     this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+                } else if (obj.type === 'jump-pad') {
+                    // Draw jump pad with arrow indicator
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+
+                    // Draw upward arrow to indicate jump boost
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.beginPath();
+                    const centerX = obj.x + obj.width / 2;
+                    const centerY = obj.y + obj.height / 2;
+                    const arrowSize = Math.min(obj.width, obj.height) * 0.3;
+
+                    // Arrow body
+                    this.ctx.fillRect(centerX - arrowSize * 0.2, centerY - arrowSize * 0.5, arrowSize * 0.4, arrowSize);
+
+                    // Arrow head
+                    this.ctx.moveTo(centerX, centerY - arrowSize * 0.7);
+                    this.ctx.lineTo(centerX - arrowSize * 0.5, centerY - arrowSize * 0.1);
+                    this.ctx.lineTo(centerX + arrowSize * 0.5, centerY - arrowSize * 0.1);
+                    this.ctx.closePath();
+                    this.ctx.fill();
                 }
             }
         });
@@ -633,6 +655,28 @@ class LevelEditor {
                 this.ctx.strokeStyle = '#4CAF50';
                 this.ctx.lineWidth = 2;
                 this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+            } else if (obj.type === 'jump-pad') {
+                // Draw jump pad with arrow indicator
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+
+                // Draw upward arrow to indicate jump boost
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                const centerX = obj.x + obj.width / 2;
+                const centerY = obj.y + obj.height / 2;
+                const arrowSize = Math.min(obj.width, obj.height) * 0.3;
+
+                // Arrow body
+                this.ctx.fillRect(centerX - arrowSize * 0.2, centerY - arrowSize * 0.5, arrowSize * 0.4, arrowSize);
+
+                // Arrow head
+                this.ctx.moveTo(centerX, centerY - arrowSize * 0.7);
+                this.ctx.lineTo(centerX - arrowSize * 0.5, centerY - arrowSize * 0.1);
+                this.ctx.lineTo(centerX + arrowSize * 0.5, centerY - arrowSize * 0.1);
+                this.ctx.closePath();
+                this.ctx.fill();
             }
         }
 
@@ -771,6 +815,30 @@ class LevelEditor {
                 this.drawSlopedObject(previewObj);
             } else {
                 this.ctx.fillRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+
+                // Add jump-pad arrow for preview
+                if (this.currentObjectType === 'jump-pad') {
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(this.mouse.x, this.mouse.y, this.objectWidth, this.objectHeight);
+
+                    // Draw upward arrow to indicate jump boost
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.beginPath();
+                    const centerX = this.mouse.x + this.objectWidth / 2;
+                    const centerY = this.mouse.y + this.objectHeight / 2;
+                    const arrowSize = Math.min(this.objectWidth, this.objectHeight) * 0.3;
+
+                    // Arrow body
+                    this.ctx.fillRect(centerX - arrowSize * 0.2, centerY - arrowSize * 0.5, arrowSize * 0.4, arrowSize);
+
+                    // Arrow head
+                    this.ctx.moveTo(centerX, centerY - arrowSize * 0.7);
+                    this.ctx.lineTo(centerX - arrowSize * 0.5, centerY - arrowSize * 0.1);
+                    this.ctx.lineTo(centerX + arrowSize * 0.5, centerY - arrowSize * 0.1);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                }
             }
         }
 
@@ -794,6 +862,7 @@ class LevelEditor {
         const colors = {
             'spike': '#ff4444',
             'platform': '#4CAF50',
+            'jump-pad': '#00ff00',
             'wall-top': '#ff9800',
             'wall-bottom': '#ff9800',
             'slope-up': '#9C27B0',
