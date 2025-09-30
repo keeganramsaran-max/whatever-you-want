@@ -108,6 +108,13 @@ class GeometryDash {
             currentProjectName: null
         };
 
+        // Custom Levels Storage System
+        this.customLevels = {
+            slots: this.loadCustomLevels(),
+            maxSlots: 10,
+            currentSlot: null
+        };
+
         this.hitboxOffset = {
             player: 4,     // Player hitbox is 4px smaller on each side
             obstacle: 3    // Obstacle hitboxes are 3px smaller on each side
@@ -469,6 +476,9 @@ class GeometryDash {
                 this.currentLevel = 'developer';
                 this.loadDeveloperChallenge();
                 document.getElementById('currentLevel').textContent = "Developer's Challenge";
+                if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
+                    this.restartGame();
+                }
             } else if (e.target.value === 'impossible') {
                 this.showLevelNotification(
                     "Warning: Impossible Level Selected",
@@ -477,13 +487,21 @@ class GeometryDash {
                         this.currentLevel = 'impossible';
                         this.loadImpossibleChallenge();
                         document.getElementById('currentLevel').textContent = "Impossible";
+                        if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
+                            this.restartGame();
+                        }
                     },
                     () => {
                         // Reset to previous level if cancelled
                         document.getElementById('levelSelect').value = '1';
                         this.currentLevel = 1;
+                        this.isCustomLevel = false;
+                        this.customLevelData = null;
                         this.generateLevel();
                         document.getElementById('currentLevel').textContent = "1";
+                        if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
+                            this.restartGame();
+                        }
                     }
                 );
             } else if (e.target.value.startsWith('project_')) {
@@ -491,9 +509,15 @@ class GeometryDash {
                 const projectName = e.target.value.replace('project_', '');
                 this.loadProjectLevel(projectName);
             } else {
+                // Regular level selected - clear custom level flags
+                this.isCustomLevel = false;
+                this.customLevelData = null;
                 this.currentLevel = parseInt(e.target.value);
                 this.generateLevel();
                 document.getElementById('currentLevel').textContent = this.currentLevel;
+                if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
+                    this.restartGame();
+                }
             }
             this.updateBackToEditorButton();
         });
@@ -602,7 +626,7 @@ class GeometryDash {
             this.player.waveHorizontalVelocity = diagonalHorizontal; // Right movement
         }
 
-        this.player.y += this.player.waveVelocity * this.deltaTime;
+        this.player.y += this.player.waveVelocity * this.deltaTime * this.gameSpeedMultiplier;
 
         // Apply horizontal movement - wave always moves forward like slopes
         this.player.x += this.player.waveHorizontalVelocity * this.gameSpeedMultiplier * this.deltaTime;
@@ -636,12 +660,12 @@ class GeometryDash {
         const maxSpeed = this.player.shipSpeed;
 
         if (isPressed) {
-            this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration * this.deltaTime, -maxSpeed);
+            this.player.shipVelocity = Math.max(this.player.shipVelocity - acceleration * this.deltaTime * this.gameSpeedMultiplier, -maxSpeed);
         } else {
-            this.player.shipVelocity = Math.min(this.player.shipVelocity + deceleration * this.deltaTime, maxSpeed);
+            this.player.shipVelocity = Math.min(this.player.shipVelocity + deceleration * this.deltaTime * this.gameSpeedMultiplier, maxSpeed);
         }
 
-        this.player.y += this.player.shipVelocity * this.deltaTime;
+        this.player.y += this.player.shipVelocity * this.deltaTime * this.gameSpeedMultiplier;
 
         if (this.player.y <= 0) {
             this.player.y = 0;
@@ -668,9 +692,8 @@ class GeometryDash {
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
         if (mode !== 'ball') return;
 
-        const adjustedGravity = this.player.gravity * this.speedMultiplier;
-        this.player.velocity += adjustedGravity * this.player.gravityDirection * this.deltaTime;
-        this.player.y += this.player.velocity * this.deltaTime;
+        this.player.velocity += this.player.gravity * this.player.gravityDirection * this.deltaTime * this.gameSpeedMultiplier;
+        this.player.y += this.player.velocity * this.deltaTime * this.gameSpeedMultiplier;
 
         this.player.rotation += this.player.velocity * 0.1;
 
@@ -2570,9 +2593,8 @@ class GeometryDash {
                 this.handleBallMovement();
                 break;
             default:
-                const adjustedGravity = this.player.gravity * this.speedMultiplier;
-                this.player.velocity += adjustedGravity * this.deltaTime;
-                this.player.y += this.player.velocity * this.deltaTime;
+                this.player.velocity += this.player.gravity * this.deltaTime * this.gameSpeedMultiplier;
+                this.player.y += this.player.velocity * this.deltaTime * this.gameSpeedMultiplier;
                 break;
         }
 
@@ -4245,64 +4267,8 @@ class GeometryDash {
     }
 
     generateFailureSuggestion(failure) {
-        const now = Date.now();
-        if (now - this.failureAnalytics.lastSuggestionTime < this.failureAnalytics.suggestionCooldown) {
-            return; // Cooldown active
-        }
-
-        const recentFailures = this.getRecentFailures(failure.position, 50);
-        if (recentFailures.length < 3) return; // Need multiple failures to suggest
-
-        let suggestion = null;
-        const dominantPattern = this.getDominantFailurePattern();
-
-        switch (dominantPattern) {
-            case 'earlyJump':
-                suggestion = {
-                    type: 'timing',
-                    title: '⏱️ Timing Tip',
-                    message: 'Try waiting a bit longer before jumping. Watch the obstacle approach more closely.',
-                    action: 'Show timing guide'
-                };
-                break;
-            case 'lateReaction':
-                suggestion = {
-                    type: 'reaction',
-                    title: '⚡ Quick Tip',
-                    message: 'React faster! Try to anticipate obstacles and prepare your timing.',
-                    action: 'Enable practice mode'
-                };
-                break;
-            case 'wrongModeTransition':
-                suggestion = {
-                    type: 'mode',
-                    title: '🔄 Mode Switch Help',
-                    message: `This section requires ${failure.gameMode} mode techniques. Check the controls guide.`,
-                    action: 'Show mode tutorial'
-                };
-                break;
-            case 'gravityConfusion':
-                suggestion = {
-                    type: 'gravity',
-                    title: '🪐 Gravity Guide',
-                    message: 'In ball mode, click to flip gravity. Time your clicks with the obstacle patterns.',
-                    action: 'Show ball mode demo'
-                };
-                break;
-            default:
-                suggestion = {
-                    type: 'general',
-                    title: '💡 Helpful Hint',
-                    message: 'Having trouble here? Try practice mode to place checkpoints and learn this section.',
-                    action: 'Enable practice mode'
-                };
-        }
-
-        if (suggestion) {
-            this.failureAnalytics.suggestions.push(suggestion);
-            this.failureAnalytics.lastSuggestionTime = now;
-            this.showSmartSuggestion(suggestion);
-        }
+        // Tips disabled
+        return;
     }
 
     getDominantFailurePattern() {
@@ -5934,7 +5900,10 @@ class GeometryDash {
         const ownerCodeInput = modal.querySelector('#ownerCodeInput');
         const ownerCode = ownerCodeInput.value.trim();
 
+        console.log('Checking owner code:', ownerCode, 'Length:', ownerCode.length);
+
         if (ownerCode === 'T00Thless!') {
+            console.log('✅ Owner code CORRECT!');
             // Owner code is correct - bypass verification
             modal.hasLevelVerification = true;
             modal.ownerCodeVerified = true;
@@ -5956,6 +5925,7 @@ class GeometryDash {
             ownerCodeInput.style.background = 'rgba(255, 215, 0, 0.1)';
 
         } else if (ownerCode === '') {
+            console.log('Owner code empty');
             // Empty code - reset to normal verification state
             modal.hasLevelVerification = false;
             modal.ownerCodeVerified = false;
@@ -6272,8 +6242,8 @@ class GeometryDash {
         // Check for required properties
         if (!data || typeof data !== 'object') return false;
 
-        // Level should have sections or obstacles
-        if (!data.sections && !data.obstacles && !data.template) return false;
+        // Level should have sections, obstacles, objects, or template
+        if (!data.sections && !data.obstacles && !data.objects && !data.template) return false;
 
         // If it has sections, validate structure
         if (data.sections && Array.isArray(data.sections)) {
@@ -6308,42 +6278,43 @@ class GeometryDash {
             projectName = nameInput.value.trim();
         }
 
-        if (!projectName) {
-            this.showUploadError('No project selected or new project name provided.');
-            return;
-        }
-
         try {
-            // Create project if it doesn't exist
-            if (!this.levelProjects.projects[projectName]) {
-                this.createNewProject(projectName);
-            } else {
-                // Load existing project
-                this.loadProject(projectName);
+            // Save to customLevels slots for User Levels page only
+            // Find an available slot
+            let targetSlot = null;
+            for (let i = 1; i <= this.customLevels.maxSlots; i++) {
+                if (!this.customLevels.slots[i]) {
+                    targetSlot = i;
+                    break;
+                }
             }
 
-            // Update project data
-            this.levelProjects.currentProject.data = validation.levelData;
-            this.levelProjects.currentProject.metadata = {
-                ...this.levelProjects.currentProject.metadata,
-                name: nameInput.value.trim(),
-                description: modal.querySelector('#levelDescriptionInput')?.value.trim() || '',
-                author: authorInput.value.trim() || this.levelProjects.currentProject.metadata.author,
-                difficulty: this.analyzeLevelDifficulty(validation.levelData),
-                lastModified: Date.now()
-            };
+            if (!targetSlot) {
+                this.showUploadError('No available slots. Maximum 10 custom levels allowed. Please delete a level first.');
+                return;
+            }
 
-            // Save the project
-            this.saveCurrentProject();
+            this.customLevels.slots[targetSlot] = {
+                data: validation.levelData,
+                metadata: {
+                    name: nameInput.value.trim(),
+                    description: modal.querySelector('#levelDescriptionInput')?.value.trim() || '',
+                    author: authorInput.value.trim() || 'Anonymous',
+                    difficulty: this.analyzeLevelDifficulty(validation.levelData),
+                    dateAdded: Date.now(),
+                    uploadDate: Date.now(),
+                    playCount: 0,
+                    bestScore: 0,
+                    rating: 0
+                }
+            };
+            this.saveCustomLevels();
 
             // Show success message
-            this.showUploadSuccess(this.levelProjects.currentProject.metadata.name, projectName);
+            this.showUploadSuccess(nameInput.value.trim(), 'User Levels');
 
             // Close modal
             document.body.removeChild(modal);
-
-            // Update level selector if needed
-            this.updateLevelSelector();
 
         } catch (error) {
             this.showUploadError(error.message);
@@ -6522,7 +6493,7 @@ class GeometryDash {
 
     initVerificationLevel(levelData) {
         // Stop any existing game
-        this.stopGame();
+        this.gameState = 'menu';
 
         // Set up verification level
         this.currentLevel = 'verification';
@@ -6722,23 +6693,8 @@ class GeometryDash {
     }
 
     updateLevelSelector() {
-        const levelSelect = document.getElementById('levelSelect');
-        if (!levelSelect) return;
-
-        // Remove existing custom level options
-        const existingCustomOptions = levelSelect.querySelectorAll('.custom-level-option');
-        existingCustomOptions.forEach(option => option.remove());
-
-        // Add project level options
-        const projects = this.getProjectList();
-        projects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = `project_${project.name}`;
-            option.textContent = `${project.name} (${project.metadata.author})`;
-            option.className = 'custom-level-option';
-            option.style.fontStyle = 'italic';
-            levelSelect.appendChild(option);
-        });
+        // Disabled - custom levels only show in User Levels page
+        return;
     }
 
     loadProjectLevel(projectName) {
