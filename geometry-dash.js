@@ -101,11 +101,11 @@ class GeometryDash {
             enabled: true
         };
 
-        // Custom Level Upload System
-        this.customLevels = {
-            slots: this.loadCustomLevels(),
-            maxSlots: 10,
-            currentSlot: null
+        // Custom Level Project System
+        this.levelProjects = {
+            projects: this.loadLevelProjects(),
+            currentProject: null,
+            currentProjectName: null
         };
 
         this.hitboxOffset = {
@@ -486,10 +486,10 @@ class GeometryDash {
                         document.getElementById('currentLevel').textContent = "1";
                     }
                 );
-            } else if (e.target.value.startsWith('custom_')) {
-                // Handle custom level selection
-                const slotNumber = parseInt(e.target.value.replace('custom_', ''));
-                this.loadUploadedLevel(slotNumber);
+            } else if (e.target.value.startsWith('project_')) {
+                // Handle project level selection
+                const projectName = e.target.value.replace('project_', '');
+                this.loadProjectLevel(projectName);
             } else {
                 this.currentLevel = parseInt(e.target.value);
                 this.generateLevel();
@@ -2294,7 +2294,7 @@ class GeometryDash {
                             this.player.x < obstacle.x + obstacle.width - 5) {
 
                             this.player.y = platformTop - this.player.height;
-                            this.player.velocity = -Math.abs(this.player.velocity) * 0.7;
+                            this.player.velocity = 0;
                             continue;
                         }
                     } else {
@@ -2309,7 +2309,7 @@ class GeometryDash {
                             this.player.x < obstacle.x + obstacle.width - 5) {
 
                             this.player.y = platformBottom;
-                            this.player.velocity = Math.abs(this.player.velocity) * 0.7;
+                            this.player.velocity = 0;
                             continue;
                         }
                     }
@@ -3237,6 +3237,12 @@ class GeometryDash {
     }
 
     levelComplete() {
+        // Check if this is verification mode
+        if (this.inVerificationMode) {
+            this.handleVerificationCompletion();
+            return;
+        }
+
         // Record completion for leaderboard (if not in auto-play mode)
         if (!this.autoPlay && this.leaderboard.enabled) {
             const completionTime = Date.now() - this.levelStartTime;
@@ -5382,22 +5388,126 @@ class GeometryDash {
 
     // === CUSTOM LEVEL UPLOAD SYSTEM ===
 
-    loadCustomLevels() {
+    loadLevelProjects() {
         try {
-            const stored = localStorage.getItem('geometryDash_customLevels');
+            const stored = localStorage.getItem('geometryDash_levelProjects');
             return stored ? JSON.parse(stored) : {};
         } catch (e) {
-            console.log('Could not load custom levels:', e);
+            console.log('Could not load level projects:', e);
             return {};
         }
     }
 
-    saveCustomLevels() {
+    saveLevelProjects() {
         try {
-            localStorage.setItem('geometryDash_customLevels', JSON.stringify(this.customLevels.slots));
+            localStorage.setItem('geometryDash_levelProjects', JSON.stringify(this.levelProjects.projects));
         } catch (e) {
-            console.log('Could not save custom levels:', e);
+            console.log('Could not save level projects:', e);
         }
+    }
+
+    createNewProject(projectName) {
+        if (this.levelProjects.projects[projectName]) {
+            throw new Error('A project with this name already exists');
+        }
+
+        const newProject = {
+            name: projectName,
+            metadata: {
+                author: this.leaderboard.currentPlayer || 'Unknown',
+                description: '',
+                difficulty: 'Medium',
+                dateCreated: Date.now(),
+                lastModified: Date.now(),
+                playCount: 0,
+                bestScore: 0,
+                rating: 0
+            },
+            data: {
+                objects: [],
+                portals: [],
+                finishPortal: null,
+                gameMode: 'mixed'
+            }
+        };
+
+        this.levelProjects.projects[projectName] = newProject;
+        this.levelProjects.currentProject = newProject;
+        this.levelProjects.currentProjectName = projectName;
+        this.saveLevelProjects();
+
+        return newProject;
+    }
+
+    saveCurrentProject() {
+        if (!this.levelProjects.currentProject || !this.levelProjects.currentProjectName) {
+            throw new Error('No project is currently loaded');
+        }
+
+        // Update the last modified time
+        this.levelProjects.currentProject.metadata.lastModified = Date.now();
+
+        // Save the current project data
+        this.levelProjects.projects[this.levelProjects.currentProjectName] = this.levelProjects.currentProject;
+        this.saveLevelProjects();
+    }
+
+    loadProject(projectName) {
+        if (!this.levelProjects.projects[projectName]) {
+            throw new Error('Project not found');
+        }
+
+        this.levelProjects.currentProject = this.levelProjects.projects[projectName];
+        this.levelProjects.currentProjectName = projectName;
+
+        return this.levelProjects.currentProject;
+    }
+
+    deleteProject(projectName) {
+        if (!this.levelProjects.projects[projectName]) {
+            throw new Error('Project not found');
+        }
+
+        delete this.levelProjects.projects[projectName];
+
+        // If this was the current project, clear it
+        if (this.levelProjects.currentProjectName === projectName) {
+            this.levelProjects.currentProject = null;
+            this.levelProjects.currentProjectName = null;
+        }
+
+        this.saveLevelProjects();
+    }
+
+    getProjectList() {
+        return Object.keys(this.levelProjects.projects).map(name => ({
+            name: name,
+            metadata: this.levelProjects.projects[name].metadata
+        })).sort((a, b) => b.metadata.lastModified - a.metadata.lastModified);
+    }
+
+    renameProject(oldName, newName) {
+        if (!this.levelProjects.projects[oldName]) {
+            throw new Error('Project not found');
+        }
+
+        if (this.levelProjects.projects[newName]) {
+            throw new Error('A project with the new name already exists');
+        }
+
+        // Copy the project data
+        this.levelProjects.projects[newName] = this.levelProjects.projects[oldName];
+        this.levelProjects.projects[newName].name = newName;
+
+        // Delete the old entry
+        delete this.levelProjects.projects[oldName];
+
+        // Update current project reference if necessary
+        if (this.levelProjects.currentProjectName === oldName) {
+            this.levelProjects.currentProjectName = newName;
+        }
+
+        this.saveLevelProjects();
     }
 
     showLevelUploadModal() {
@@ -5501,15 +5611,33 @@ class GeometryDash {
                         "></textarea>
                     </div>
 
-                    <div class="level-slot-selector" style="margin-bottom: 20px;">
-                        <h4 style="color: #00ff88; margin-bottom: 15px;">Select Level Slot:</h4>
-                        <div class="slot-grid" id="slotGrid" style="
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                            gap: 10px;
-                            margin-bottom: 20px;
-                        ">
-                            ${this.generateSlotButtons()}
+                    <div class="project-selector" style="margin-bottom: 20px;">
+                        <h4 style="color: #00ff88; margin-bottom: 15px;">Save As Project:</h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <input type="text" id="projectNameInput" placeholder="Enter project name..." style="
+                                flex: 1;
+                                background: rgba(0, 255, 136, 0.1);
+                                border: 1px solid #00ff88;
+                                border-radius: 6px;
+                                padding: 12px;
+                                color: white;
+                                font-size: 1rem;
+                            ">
+                            <button id="createProjectBtn" style="
+                                background: linear-gradient(45deg, #00ff88, #00cc6a);
+                                color: #1a1a2e;
+                                border: none;
+                                padding: 12px 20px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-weight: bold;
+                                white-space: nowrap;
+                            ">Create New</button>
+                        </div>
+                        <div style="max-height: 150px; overflow-y: auto; border: 1px solid #444; border-radius: 6px; padding: 10px;">
+                            <div id="existingProjectsList">
+                                ${this.generateProjectList()}
+                            </div>
                         </div>
                     </div>
 
@@ -5555,6 +5683,57 @@ class GeometryDash {
                         </div>
                     </div>
 
+                    <div id="levelVerificationSection" style="
+                        background: rgba(255, 193, 7, 0.1);
+                        border: 1px solid #ffc107;
+                        border-radius: 8px;
+                        padding: 20px;
+                        margin: 20px 0;
+                        text-align: center;
+                    ">
+                        <h4 style="color: #ffc107; margin: 0 0 15px 0;">⚠️ Level Verification Required</h4>
+                        <p style="margin: 0 0 15px 0; color: #ccc;">
+                            You must complete your level before uploading to ensure it's beatable!
+                        </p>
+                        <div id="verificationStatus" style="margin: 15px 0;">
+                            <span id="verificationStatusText" style="
+                                color: #ff6b6b;
+                                font-weight: bold;
+                            ">❌ Level not verified</span>
+                        </div>
+                        <div class="owner-code-section" style="margin: 15px 0;">
+                            <input type="password" id="ownerCodeInput" placeholder="Owner Code (optional)" style="
+                                background: rgba(255, 193, 7, 0.1);
+                                border: 1px solid #ffc107;
+                                border-radius: 6px;
+                                padding: 8px 12px;
+                                color: white;
+                                font-size: 0.9rem;
+                                text-align: center;
+                                width: 200px;
+                                margin-bottom: 5px;
+                            ">
+                            <div style="font-size: 0.8rem; color: #aaa;">
+                                Enter owner code to bypass verification
+                            </div>
+                        </div>
+                        <button id="testLevelBtn" style="
+                            background: linear-gradient(45deg, #ffc107, #ff9800);
+                            color: #1a1a2e;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            margin-right: 10px;
+                        " disabled>🎮 Test Level</button>
+                        <div id="testInstructions" style="
+                            margin-top: 10px;
+                            font-size: 0.9rem;
+                            color: #aaa;
+                        ">Upload level data first to enable testing</div>
+                    </div>
+
                     <div class="upload-actions" style="display: flex; gap: 15px; justify-content: center;">
                         <button id="uploadLevelBtn" style="
                             background: linear-gradient(45deg, #00ff88, #00cc6a);
@@ -5565,6 +5744,7 @@ class GeometryDash {
                             cursor: pointer;
                             font-weight: bold;
                             font-size: 1.1rem;
+                            opacity: 0.5;
                         " disabled>Upload Level</button>
                         <button id="cancelUploadBtn" style="
                             background: transparent;
@@ -5583,31 +5763,216 @@ class GeometryDash {
         this.setupLevelUploadListeners(modal);
     }
 
-    generateSlotButtons() {
-        let buttons = '';
-        for (let i = 1; i <= this.customLevels.maxSlots; i++) {
-            const slot = this.customLevels.slots[i];
-            const isOccupied = slot && slot.name;
+    generateProjectList() {
+        const projects = this.getProjectList();
 
-            buttons += `
-                <button class="slot-btn ${isOccupied ? 'occupied' : 'empty'}" data-slot="${i}" style="
-                    background: ${isOccupied ? 'rgba(255, 136, 0, 0.2)' : 'rgba(0, 255, 136, 0.1)'};
-                    border: 2px solid ${isOccupied ? '#ff8800' : '#00ff88'};
-                    border-radius: 8px;
-                    padding: 15px 10px;
+        if (projects.length === 0) {
+            return '<div style="color: #888; text-align: center; padding: 20px;">No projects yet. Create your first project above!</div>';
+        }
+
+        let html = '';
+        projects.forEach(project => {
+            const lastModified = new Date(project.metadata.lastModified).toLocaleDateString();
+            html += `
+                <div class="project-item" data-project="${project.name}" style="
+                    background: rgba(0, 255, 136, 0.1);
+                    border: 1px solid #00ff88;
+                    border-radius: 6px;
+                    padding: 12px;
+                    margin-bottom: 8px;
                     cursor: pointer;
                     transition: all 0.3s ease;
-                    color: white;
-                    text-align: center;
-                ">
-                    <div style="font-weight: bold; margin-bottom: 5px;">Slot ${i}</div>
-                    <div style="font-size: 0.8rem; opacity: 0.8;">
-                        ${isOccupied ? slot.name : 'Empty'}
+                " onmouseover="this.style.background='rgba(0, 255, 136, 0.2)'"
+                   onmouseout="this.style.background='rgba(0, 255, 136, 0.1)'">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold; color: #00ff88;">${project.name}</div>
+                            <div style="font-size: 0.8rem; color: #aaa;">Modified: ${lastModified}</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="select-project-btn" data-project="${project.name}" style="
+                                background: #00ff88;
+                                color: #1a1a2e;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 0.8rem;
+                                font-weight: bold;
+                            ">Select</button>
+                            <button class="delete-project-btn" data-project="${project.name}" style="
+                                background: #ff4444;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 0.8rem;
+                                font-weight: bold;
+                            ">Delete</button>
+                        </div>
                     </div>
-                </button>
+                </div>
             `;
+        });
+
+        return html;
+    }
+
+    refreshProjectList(modal) {
+        const projectsList = modal.querySelector('#existingProjectsList');
+        if (projectsList) {
+            projectsList.innerHTML = this.generateProjectList();
         }
-        return buttons;
+    }
+
+    selectProject(projectName, modal) {
+        try {
+            this.loadProject(projectName);
+
+            // Update UI to show selected project
+            const projectItems = modal.querySelectorAll('.project-item');
+            projectItems.forEach(item => {
+                if (item.dataset.project === projectName) {
+                    item.style.background = 'rgba(0, 255, 136, 0.3)';
+                    item.style.borderColor = '#00ff88';
+                } else {
+                    item.style.background = 'rgba(0, 255, 136, 0.1)';
+                    item.style.borderColor = '#00ff88';
+                }
+            });
+
+            // Auto-populate level name if not already filled
+            const nameInput = modal.querySelector('#levelNameInput');
+            if (!nameInput.value.trim()) {
+                nameInput.value = projectName;
+            }
+
+            this.validateLevelData(modal);
+            this.showUploadSuccess(`Project "${projectName}" selected!`, '');
+        } catch (error) {
+            this.showUploadError(error.message);
+        }
+    }
+
+    confirmDeleteProject(projectName, modal) {
+        const confirmModal = document.createElement('div');
+        confirmModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1700;
+        `;
+
+        confirmModal.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 2px solid #ff4444;
+                border-radius: 15px;
+                padding: 30px;
+                max-width: 400px;
+                color: white;
+                text-align: center;
+            ">
+                <h3 style="color: #ff4444; margin: 0 0 15px 0;">⚠️ Delete Project</h3>
+                <p style="margin: 0 0 20px 0;">Are you sure you want to delete the project "${projectName}"?</p>
+                <p style="margin: 0 0 20px 0; color: #aaa; font-size: 0.9rem;">This action cannot be undone.</p>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button id="confirmDeleteBtn" style="
+                        background: #ff4444;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">Delete</button>
+                    <button id="cancelDeleteBtn" style="
+                        background: transparent;
+                        color: #888;
+                        border: 1px solid #666;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                    ">Cancel</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(confirmModal);
+
+        const confirmBtn = confirmModal.querySelector('#confirmDeleteBtn');
+        const cancelBtn = confirmModal.querySelector('#cancelDeleteBtn');
+
+        const closeConfirm = () => {
+            document.body.removeChild(confirmModal);
+        };
+
+        confirmBtn.addEventListener('click', () => {
+            try {
+                this.deleteProject(projectName);
+                this.refreshProjectList(modal);
+                this.validateLevelData(modal);
+                closeConfirm();
+                this.showUploadSuccess(`Project "${projectName}" deleted.`, '');
+            } catch (error) {
+                this.showUploadError(error.message);
+                closeConfirm();
+            }
+        });
+
+        cancelBtn.addEventListener('click', closeConfirm);
+    }
+
+    checkOwnerCode(modal) {
+        const ownerCodeInput = modal.querySelector('#ownerCodeInput');
+        const ownerCode = ownerCodeInput.value.trim();
+
+        if (ownerCode === 'T00Thless!') {
+            // Owner code is correct - bypass verification
+            modal.hasLevelVerification = true;
+            modal.ownerCodeVerified = true;
+
+            // Update verification status
+            this.updateVerificationStatus(modal, true);
+
+            // Update verification section to show owner bypass
+            const statusText = modal.querySelector('#verificationStatusText');
+            const verificationSection = modal.querySelector('#levelVerificationSection');
+
+            statusText.innerHTML = '👑 Owner verified - Upload enabled!';
+            statusText.style.color = '#ffd700';
+            verificationSection.style.borderColor = '#ffd700';
+            verificationSection.style.background = 'rgba(255, 215, 0, 0.1)';
+
+            // Update owner code input styling
+            ownerCodeInput.style.borderColor = '#ffd700';
+            ownerCodeInput.style.background = 'rgba(255, 215, 0, 0.1)';
+
+        } else if (ownerCode === '') {
+            // Empty code - reset to normal verification state
+            modal.hasLevelVerification = false;
+            modal.ownerCodeVerified = false;
+            this.updateVerificationStatus(modal, false);
+
+            // Reset owner code input styling
+            ownerCodeInput.style.borderColor = '#ffc107';
+            ownerCodeInput.style.background = 'rgba(255, 193, 7, 0.1)';
+
+        } else if (ownerCode.length > 0) {
+            // Wrong code entered
+            ownerCodeInput.style.borderColor = '#ff4444';
+            ownerCodeInput.style.background = 'rgba(255, 68, 68, 0.1)';
+        }
+
+        // Re-validate to update upload button
+        this.validateLevelData(modal);
     }
 
     setupLevelUploadListeners(modal) {
@@ -5667,12 +6032,36 @@ class GeometryDash {
             }
         });
 
-        // Slot selection
+        // Project management
+        const createProjectBtn = modal.querySelector('#createProjectBtn');
+        const projectNameInput = modal.querySelector('#projectNameInput');
+
+        createProjectBtn.addEventListener('click', () => {
+            const projectName = projectNameInput.value.trim();
+            if (!projectName) {
+                this.showUploadError('Please enter a project name.');
+                return;
+            }
+
+            try {
+                this.createNewProject(projectName);
+                this.refreshProjectList(modal);
+                projectNameInput.value = '';
+                this.validateLevelData(modal);
+                this.showUploadSuccess(`Project "${projectName}" created!`, '');
+            } catch (error) {
+                this.showUploadError(error.message);
+            }
+        });
+
+        // Project selection and deletion
         modal.addEventListener('click', (e) => {
-            if (e.target.classList.contains('slot-btn') || e.target.parentElement.classList.contains('slot-btn')) {
-                const slotBtn = e.target.classList.contains('slot-btn') ? e.target : e.target.parentElement;
-                const slotNumber = parseInt(slotBtn.dataset.slot);
-                this.selectLevelSlot(slotNumber, modal);
+            if (e.target.classList.contains('select-project-btn')) {
+                const projectName = e.target.dataset.project;
+                this.selectProject(projectName, modal);
+            } else if (e.target.classList.contains('delete-project-btn')) {
+                const projectName = e.target.dataset.project;
+                this.confirmDeleteProject(projectName, modal);
             }
         });
 
@@ -5680,6 +6069,18 @@ class GeometryDash {
         const jsonInput = modal.querySelector('#levelJsonInput');
         jsonInput.addEventListener('input', () => {
             this.validateLevelData(modal);
+        });
+
+        // Owner code input handler
+        const ownerCodeInput = modal.querySelector('#ownerCodeInput');
+        ownerCodeInput.addEventListener('input', () => {
+            this.checkOwnerCode(modal);
+        });
+
+        // Test Level button
+        const testLevelBtn = modal.querySelector('#testLevelBtn');
+        testLevelBtn.addEventListener('click', () => {
+            this.startLevelVerification(modal);
         });
 
         // Upload button
@@ -5783,10 +6184,16 @@ class GeometryDash {
         let levelData = null;
         let validationErrors = [];
 
-        // Check if slot is selected
-        if (!this.customLevels.currentSlot) {
+        // Check if project is selected or can be created
+        const projectNameInput = modal.querySelector('#projectNameInput');
+        const hasSelectedProject = this.levelProjects.currentProjectName;
+        const hasNewProjectName = projectNameInput && projectNameInput.value.trim();
+        const levelName = nameInput.value.trim();
+
+        // Allow using level name as project name if no project is specified
+        if (!hasSelectedProject && !hasNewProjectName && !levelName) {
             isValid = false;
-            validationErrors.push('No slot selected');
+            validationErrors.push('No project selected, new project name, or level name provided');
         }
 
         // Check if name is provided
@@ -5817,20 +6224,45 @@ class GeometryDash {
         // Debug logging
         console.log('Validation check:', {
             isValid,
-            currentSlot: this.customLevels.currentSlot,
+            currentProject: this.levelProjects.currentProjectName,
+            hasSelectedProject,
+            hasNewProjectName,
+            newProjectName: projectNameInput?.value,
             levelName: nameInput.value.trim(),
             hasJsonData: !!jsonInput.value.trim(),
             validationErrors
         });
 
+        // Update test level button state
+        const testLevelBtn = modal.querySelector('#testLevelBtn');
+        const testInstructions = modal.querySelector('#testInstructions');
+        const hasValidData = levelData !== null && this.isValidLevelData(levelData);
+
+        testLevelBtn.disabled = !hasValidData;
+        testLevelBtn.style.opacity = hasValidData ? '1' : '0.5';
+
+        if (hasValidData) {
+            testInstructions.textContent = 'Test your level to verify it\'s beatable!';
+            testInstructions.style.color = '#00ff88';
+        } else {
+            testInstructions.textContent = 'Upload level data first to enable testing';
+            testInstructions.style.color = '#aaa';
+        }
+
+        // Check if level is verified (only enable upload if verified)
+        const isVerified = modal.hasLevelVerification || false;
+        const canUpload = isValid && isVerified;
+
         // Update upload button state
-        uploadBtn.disabled = !isValid;
-        uploadBtn.style.opacity = isValid ? '1' : '0.5';
+        uploadBtn.disabled = !canUpload;
+        uploadBtn.style.opacity = canUpload ? '1' : '0.5';
 
         if (!isValid) {
             uploadBtn.title = 'Validation errors: ' + validationErrors.join(', ');
+        } else if (!isVerified) {
+            uploadBtn.title = 'Complete the level verification test or enter owner code';
         } else {
-            uploadBtn.title = 'Upload level';
+            uploadBtn.title = modal.ownerCodeVerified ? 'Upload level (Owner verified)' : 'Upload level';
         }
 
         return { isValid, levelData };
@@ -5864,33 +6296,58 @@ class GeometryDash {
 
         const nameInput = modal.querySelector('#levelNameInput');
         const authorInput = modal.querySelector('#levelAuthorInput');
+        const projectNameInput = modal.querySelector('#projectNameInput');
 
-        const levelInfo = {
-            data: validation.levelData,
-            metadata: {
+        // Determine project name (either selected project, new project name, or level name)
+        let projectName = this.levelProjects.currentProjectName;
+        if (!projectName && projectNameInput && projectNameInput.value.trim()) {
+            projectName = projectNameInput.value.trim();
+        }
+        if (!projectName && nameInput.value.trim()) {
+            // Use level name as project name if no other name is provided
+            projectName = nameInput.value.trim();
+        }
+
+        if (!projectName) {
+            this.showUploadError('No project selected or new project name provided.');
+            return;
+        }
+
+        try {
+            // Create project if it doesn't exist
+            if (!this.levelProjects.projects[projectName]) {
+                this.createNewProject(projectName);
+            } else {
+                // Load existing project
+                this.loadProject(projectName);
+            }
+
+            // Update project data
+            this.levelProjects.currentProject.data = validation.levelData;
+            this.levelProjects.currentProject.metadata = {
+                ...this.levelProjects.currentProject.metadata,
                 name: nameInput.value.trim(),
                 description: modal.querySelector('#levelDescriptionInput')?.value.trim() || '',
-                author: authorInput.value.trim() || 'Unknown',
+                author: authorInput.value.trim() || this.levelProjects.currentProject.metadata.author,
                 difficulty: this.analyzeLevelDifficulty(validation.levelData),
-                dateAdded: Date.now(),
-                playCount: 0,
-                bestScore: 0,
-                rating: 0
-            }
-        };
+                lastModified: Date.now()
+            };
 
-        // Save to slot
-        this.customLevels.slots[this.customLevels.currentSlot] = levelInfo;
-        this.saveCustomLevels();
+            // Save the project
+            this.saveCurrentProject();
 
-        // Show success message
-        this.showUploadSuccess(levelInfo.metadata.name, this.customLevels.currentSlot);
+            // Show success message
+            this.showUploadSuccess(this.levelProjects.currentProject.metadata.name, projectName);
 
-        // Close modal
-        document.body.removeChild(modal);
+            // Close modal
+            document.body.removeChild(modal);
 
-        // Update level selector if needed
-        this.updateLevelSelector();
+            // Update level selector if needed
+            this.updateLevelSelector();
+
+        } catch (error) {
+            this.showUploadError(error.message);
+        }
 
         // Refresh User Levels page if it's currently open
         const userLevelsPage = document.getElementById('userLevelsPage');
@@ -5967,6 +6424,303 @@ class GeometryDash {
         }, 4000);
     }
 
+    // Level Verification System
+    startLevelVerification(modal) {
+        const validation = this.validateLevelData(modal);
+
+        if (!validation.isValid || !validation.levelData) {
+            this.showUploadError('Please fix validation errors before testing the level.');
+            return;
+        }
+
+        // Hide the upload modal temporarily
+        modal.style.display = 'none';
+
+        // Store the modal reference for later
+        this.tempUploadModal = modal;
+
+        // Create verification overlay
+        this.showVerificationOverlay();
+
+        // Start the verification game
+        this.startVerificationGame(validation.levelData);
+    }
+
+    showVerificationOverlay() {
+        const overlay = document.createElement('div');
+        overlay.id = 'verificationOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1800;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        `;
+
+        overlay.innerHTML = `
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #ffc107; margin: 0 0 15px 0;">🎮 Level Verification Test</h2>
+                <p style="margin: 0 0 10px 0; font-size: 1.1rem;">Complete your level to verify it's beatable!</p>
+                <p style="margin: 0; color: #aaa;">The game will start in a moment...</p>
+                <div style="margin: 20px 0;">
+                    <button id="cancelVerificationBtn" style="
+                        background: #ff4444;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">Cancel Test</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Add cancel functionality
+        const cancelBtn = overlay.querySelector('#cancelVerificationBtn');
+        cancelBtn.addEventListener('click', () => {
+            this.cancelVerification();
+        });
+    }
+
+    startVerificationGame(levelData) {
+        // Store original game state
+        this.originalGameState = {
+            gameRunning: this.gameRunning,
+            gamePaused: this.gamePaused,
+            currentLevel: this.currentLevel,
+            gameMode: this.gameMode,
+            inVerificationMode: false
+        };
+
+        // Set verification mode
+        this.inVerificationMode = true;
+        this.verificationLevelData = levelData;
+
+        // Initialize the verification game
+        setTimeout(() => {
+            this.hideVerificationOverlay();
+            this.initVerificationLevel(levelData);
+        }, 2000);
+    }
+
+    hideVerificationOverlay() {
+        const overlay = document.getElementById('verificationOverlay');
+        if (overlay) {
+            document.body.removeChild(overlay);
+        }
+    }
+
+    initVerificationLevel(levelData) {
+        // Stop any existing game
+        this.stopGame();
+
+        // Set up verification level
+        this.currentLevel = 'verification';
+        this.gameMode = 'mixed'; // Default to mixed mode
+
+        // Load the custom level data
+        this.loadCustomLevelForVerification(levelData);
+
+        // Start the verification game
+        this.startGame();
+
+        // Show verification UI
+        this.showVerificationUI();
+    }
+
+    loadCustomLevelForVerification(levelData) {
+        // Store the level data for verification
+        this.verificationLevel = levelData;
+        this.customLevelData = levelData;
+        this.isCustomLevel = true;
+
+        // Set up the level similar to how custom levels are loaded
+        if (levelData.gameMode) {
+            this.gameMode = levelData.gameMode;
+        }
+
+        // Load obstacles
+        this.obstacles = levelData.objects ? levelData.objects.map(obj => ({
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            type: obj.type,
+            rotation: obj.rotation || 0
+        })) : [];
+
+        // Load portals if they exist
+        this.portals = levelData.portals ? levelData.portals.map(portal => ({
+            x: portal.x,
+            y: portal.y,
+            width: portal.width,
+            height: portal.height,
+            fromMode: 'cube',
+            toMode: portal.mode,
+            rotation: portal.rotation || 0
+        })) : [];
+
+        // Initialize finish portal if it exists
+        this.finishPortal = levelData.finishPortal || null;
+    }
+
+    showVerificationUI() {
+        const ui = document.createElement('div');
+        ui.id = 'verificationUI';
+        ui.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 193, 7, 0.9);
+            color: #1a1a2e;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 1500;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid #ffc107;
+        `;
+
+        ui.innerHTML = `
+            <div>🎮 VERIFICATION MODE</div>
+            <div style="font-size: 0.9rem; margin-top: 5px;">Complete the level to verify it's beatable!</div>
+            <button id="exitVerificationBtn" style="
+                background: #ff4444;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                margin-top: 10px;
+                cursor: pointer;
+                font-size: 0.9rem;
+            ">Exit Test</button>
+        `;
+
+        document.body.appendChild(ui);
+
+        // Add exit functionality
+        const exitBtn = ui.querySelector('#exitVerificationBtn');
+        exitBtn.addEventListener('click', () => {
+            this.cancelVerification();
+        });
+    }
+
+    handleVerificationCompletion() {
+        // Level completed successfully!
+        this.hideVerificationUI();
+
+        // Mark verification as successful
+        if (this.tempUploadModal) {
+            this.tempUploadModal.hasLevelVerification = true;
+            this.updateVerificationStatus(this.tempUploadModal, true);
+            this.tempUploadModal.style.display = 'flex';
+        }
+
+        // Restore original game state
+        this.exitVerificationMode();
+
+        // Show success message
+        this.showVerificationSuccess();
+    }
+
+    updateVerificationStatus(modal, isVerified) {
+        const statusText = modal.querySelector('#verificationStatusText');
+        const verificationSection = modal.querySelector('#levelVerificationSection');
+
+        if (isVerified) {
+            statusText.innerHTML = '✅ Level verified - Ready to upload!';
+            statusText.style.color = '#00ff88';
+            verificationSection.style.borderColor = '#00ff88';
+            verificationSection.style.background = 'rgba(0, 255, 136, 0.1)';
+        } else {
+            statusText.innerHTML = '❌ Level not verified';
+            statusText.style.color = '#ff6b6b';
+        }
+
+        // Re-validate to update upload button
+        this.validateLevelData(modal);
+    }
+
+    showVerificationSuccess() {
+        const success = document.createElement('div');
+        success.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            z-index: 1900;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+        `;
+
+        success.innerHTML = `
+            <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+            <h3 style="margin: 0 0 10px 0;">Level Verified!</h3>
+            <p style="margin: 0;">Your level is beatable and ready to upload!</p>
+        `;
+
+        document.body.appendChild(success);
+
+        setTimeout(() => {
+            if (document.body.contains(success)) {
+                document.body.removeChild(success);
+            }
+        }, 3000);
+    }
+
+    cancelVerification() {
+        this.hideVerificationOverlay();
+        this.hideVerificationUI();
+        this.exitVerificationMode();
+
+        // Show the upload modal again
+        if (this.tempUploadModal) {
+            this.tempUploadModal.style.display = 'flex';
+        }
+    }
+
+    hideVerificationUI() {
+        const ui = document.getElementById('verificationUI');
+        if (ui) {
+            document.body.removeChild(ui);
+        }
+    }
+
+    exitVerificationMode() {
+        this.inVerificationMode = false;
+        this.verificationLevelData = null;
+        this.verificationLevel = null;
+
+        // Restore original game state if it was stored
+        if (this.originalGameState) {
+            this.currentLevel = this.originalGameState.currentLevel;
+            this.gameMode = this.originalGameState.gameMode;
+
+            // Stop verification game
+            this.stopGame();
+
+            this.originalGameState = null;
+        }
+
+        this.tempUploadModal = null;
+    }
+
     updateLevelSelector() {
         const levelSelect = document.getElementById('levelSelect');
         if (!levelSelect) return;
@@ -5975,17 +6729,42 @@ class GeometryDash {
         const existingCustomOptions = levelSelect.querySelectorAll('.custom-level-option');
         existingCustomOptions.forEach(option => option.remove());
 
-        // Add custom level options
-        for (let i = 1; i <= this.customLevels.maxSlots; i++) {
-            const slot = this.customLevels.slots[i];
-            if (slot && slot.name) {
-                const option = document.createElement('option');
-                option.value = `custom_${i}`;
-                option.textContent = `${slot.name} (${slot.author})`;
-                option.className = 'custom-level-option';
-                option.style.fontStyle = 'italic';
-                levelSelect.appendChild(option);
+        // Add project level options
+        const projects = this.getProjectList();
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = `project_${project.name}`;
+            option.textContent = `${project.name} (${project.metadata.author})`;
+            option.className = 'custom-level-option';
+            option.style.fontStyle = 'italic';
+            levelSelect.appendChild(option);
+        });
+    }
+
+    loadProjectLevel(projectName) {
+        try {
+            const project = this.levelProjects.projects[projectName];
+            if (!project || !project.data) {
+                this.showUploadError(`Project "${projectName}" not found or has no data`);
+                return;
             }
+
+            // Set up custom level state
+            this.currentLevel = `project_${projectName}`;
+            this.isCustomLevel = true;
+            this.customLevelData = project.data;
+
+            // Update UI
+            document.getElementById('currentLevel').textContent = project.metadata.name;
+
+            // Generate and restart level
+            this.generateLevel();
+            this.restartGame();
+
+            console.log(`Loaded project level: ${projectName}`);
+        } catch (error) {
+            console.error('Error loading project level:', error);
+            this.showUploadError(`Failed to load project: ${error.message}`);
         }
     }
 
