@@ -1,5 +1,7 @@
 # Geometry Dash Game
 
+[![Game CI/CD](https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml/badge.svg)](https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml)
+
 A complete Geometry Dash clone with level editor built with HTML5 Canvas and JavaScript.
 
 ## Play Online

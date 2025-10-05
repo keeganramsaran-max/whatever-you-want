@@ -1,0 +1,73 @@
+name: Game CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Validate HTML files
+      run: |
+        npm install -g html-validate
+        html-validate "*.html" || true
+
+    - name: Check JavaScript syntax
+      run: |
+        npm install -g eslint
+        npx eslint "*.js" --no-eslintrc --parser-options=ecmaVersion:2020 || true
+
+    - name: Check for broken links in HTML
+      run: |
+        echo "Checking HTML files for broken internal links..."
+        for file in *.html; do
+          echo "Checking $file"
+          grep -oP 'href="[^"]*"' "$file" | grep -v "http" || true
+          grep -oP 'src="[^"]*"' "$file" | grep -v "http" || true
+        done
+
+    - name: Verify game files exist
+      run: |
+        echo "Verifying core game files..."
+        test -f index.html && echo "✓ index.html exists" || exit 1
+        test -f geometry-dash.html && echo "✓ geometry-dash.html exists" || exit 1
+        test -f geometry-dash.js && echo "✓ geometry-dash.js exists" || exit 1
+        test -f level-editor.html && echo "✓ level-editor.html exists" || exit 1
+        test -f level-editor.js && echo "✓ level-editor.js exists" || exit 1
+
+    - name: Check file structure
+      run: |
+        echo "Game structure:"
+        ls -lah *.html *.js 2>/dev/null || true
+        echo ""
+        echo "All files:"
+        find . -type f -not -path "./.git/*" | sort
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.event_name == 'push'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
+        exclude_assets: '.github,.git,.claude'

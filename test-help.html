@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Menu Test</title>
+    <style>
+        .help-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .help-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            color: black;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .close-btn {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>Help Menu Test</h1>
+    <button id="helpBtn">Show Help</button>
+
+    <div class="help-menu" id="helpMenu">
+        <div class="help-content">
+            <h2>Help Menu</h2>
+            <p>This is a test of the help menu functionality.</p>
+            <button id="closeHelpBtn" class="close-btn">Close</button>
+        </div>
+    </div>
+
+    <script>
+        console.log('Script loaded');
+
+        function showHelpMenu() {
+            console.log('Showing help menu');
+            const helpMenu = document.getElementById('helpMenu');
+            if (helpMenu) {
+                helpMenu.style.display = 'flex';
+                console.log('Help menu displayed');
+            } else {
+                console.error('Help menu element not found');
+            }
+        }
+
+        function hideHelpMenu() {
+            console.log('Hiding help menu');
+            const helpMenu = document.getElementById('helpMenu');
+            if (helpMenu) {
+                helpMenu.style.display = 'none';
+                console.log('Help menu hidden');
+            } else {
+                console.error('Help menu element not found');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded');
+
+            const helpBtn = document.getElementById('helpBtn');
+            const closeHelpBtn = document.getElementById('closeHelpBtn');
+            const helpMenu = document.getElementById('helpMenu');
+
+            console.log('Elements found:', {
+                helpBtn: !!helpBtn,
+                closeHelpBtn: !!closeHelpBtn,
+                helpMenu: !!helpMenu
+            });
+
+            if (helpBtn) {
+                helpBtn.addEventListener('click', () => {
+                    console.log('Help button clicked');
+                    showHelpMenu();
+                });
+            }
+
+            if (closeHelpBtn) {
+                closeHelpBtn.addEventListener('click', () => {
+                    console.log('Close button clicked');
+                    hideHelpMenu();
+                });
+            }
+
+            if (helpMenu) {
+                helpMenu.addEventListener('click', (e) => {
+                    if (e.target.id === 'helpMenu') {
+                        console.log('Background clicked');
+                        hideHelpMenu();
+                    }
+                });
+            }
+
+            // ESC key support
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Escape') {
+                    const helpMenu = document.getElementById('helpMenu');
+                    if (helpMenu && helpMenu.style.display === 'flex') {
+                        hideHelpMenu();
+                        e.preventDefault();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
