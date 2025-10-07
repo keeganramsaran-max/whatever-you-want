@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1v1 / Co-op Arena Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #menu {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .mode-btn {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            margin: 15px 0;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+        }
+
+        .pvp-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .pvp-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        .coop-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .coop-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        #gameContainer {
+            display: none;
+            position: relative;
+        }
+
+        canvas {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
+
+        .score {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameOver h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        #restartBtn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        #restartBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-size: 0.9em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>🎮 Arena Battle</h1>
+        <button class="mode-btn pvp-btn" onclick="startGame('pvp')">⚔️ 1v1 Mode</button>
+        <button class="mode-btn coop-btn" onclick="startGame('coop')">🤝 Co-op Mode</button>
+        <p style="margin-top: 20px; color: #666;">
+            <strong>1v1:</strong> Compete for points!<br>
+            <strong>Co-op:</strong> Survive waves together!
+        </p>
+    </div>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="ui">
+            <div class="score" id="player1Score">P1: 0</div>
+            <div class="score" id="player2Score">P2: 0</div>
+        </div>
+        <div class="controls">
+            P1: WASD to move, SPACE to shoot | P2: Arrow keys to move, ENTER to shoot
+        </div>
+        <div id="gameOver">
+            <h2 id="gameOverText"></h2>
+            <button id="restartBtn" onclick="location.reload()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let gameMode = null;
+        let gameActive = false;
+
+        // Game state
+        let player1 = null;
+        let player2 = null;
+        let bullets = [];
+        let enemies = [];
+        let collectibles = [];
+        let score1 = 0;
+        let score2 = 0;
+        let wave = 1;
+        let enemySpawnTimer = 0;
+        let collectibleSpawnTimer = 0;
+
+        // Input handling
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.key] = true);
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+        // Player class
+        class Player {
+            constructor(x, y, color, controls) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.color = color;
+                this.speed = 4;
+                this.controls = controls;
+                this.shootCooldown = 0;
+                this.health = 100;
+            }
+
+            update() {
+                // Movement
+                if (keys[this.controls.up] && this.y > 0) this.y -= this.speed;
+                if (keys[this.controls.down] && this.y < canvas.height - this.height) this.y += this.speed;
+                if (keys[this.controls.left] && this.x > 0) this.x -= this.speed;
+                if (keys[this.controls.right] && this.x < canvas.width - this.width) this.x += this.speed;
+
+                // Shooting
+                if (this.shootCooldown > 0) this.shootCooldown--;
+                if (keys[this.controls.shoot] && this.shootCooldown === 0) {
+                    this.shoot();
+                    this.shootCooldown = 20;
+                }
+            }
+
+            shoot() {
+                bullets.push({
+                    x: this.x + this.width / 2,
+                    y: this.y,
+                    width: 5,
+                    height: 10,
+                    speed: -7,
+                    color: this.color,
+                    owner: this
+                });
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Health bar
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                ctx.fillRect(this.x, this.y - 10, this.width, 5);
+                ctx.fillStyle = 'red';
+                ctx.fillRect(this.x, this.y - 10, this.width * (this.health / 100), 5);
+            }
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+        }
+
+        // Enemy class
+        class Enemy {
+            constructor(x, y, type = 'normal') {
+                this.x = x;
+                this.y = y;
+                this.width = 25;
+                this.height = 25;
+                this.type = type;
+                this.speed = type === 'fast' ? 3 : 1.5;
+                this.health = type === 'tank' ? 3 : 1;
+                this.color = type === 'tank' ? '#8B0000' : type === 'fast' ? '#FF6B6B' : '#FF0000';
+            }
+
+            update() {
+                this.y += this.speed;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+        }
+
+        // Collectible class
+        class Collectible {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.width = 20;
+                this.height = 20;
+                this.type = type; // 'health' or 'point'
+                this.color = type === 'health' ? '#00FF00' : '#FFD700';
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Symbol
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.type === 'health' ? '+' : '★', this.x + this.width/2, this.y + this.height/2 + 5);
+            }
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            gameActive = true;
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+
+            // Initialize players
+            player1 = new Player(100, 500, '#4facfe', {
+                up: 'w', down: 's', left: 'a', right: 'd', shoot: ' '
+            });
+
+            player2 = new Player(670, 500, '#f5576c', {
+                up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shoot: 'Enter'
+            });
+
+            if (gameMode === 'pvp') {
+                document.getElementById('player1Score').textContent = 'P1: 0';
+                document.getElementById('player2Score').textContent = 'P2: 0';
+            } else {
+                document.getElementById('player1Score').textContent = 'Wave: 1';
+                document.getElementById('player2Score').textContent = 'Lives: 100';
+            }
+
+            gameLoop();
+        }
+
+        function spawnEnemy() {
+            const x = Math.random() * (canvas.width - 25);
+            const types = ['normal', 'normal', 'fast', 'tank'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            enemies.push(new Enemy(x, -25, type));
+        }
+
+        function spawnCollectible() {
+            const x = Math.random() * (canvas.width - 20);
+            const y = Math.random() * (canvas.height / 2);
+            const type = Math.random() > 0.5 ? 'health' : 'point';
+            collectibles.push(new Collectible(x, y, type));
+        }
+
+        function updateGame() {
+            // Update players
+            player1.update();
+            player2.update();
+
+            // Update bullets
+            bullets.forEach((bullet, index) => {
+                bullet.y += bullet.speed;
+
+                // Remove off-screen bullets
+                if (bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(index, 1);
+                    return;
+                }
+
+                // Check enemy collisions
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (bullet.x > enemy.x && bullet.x < enemy.x + enemy.width &&
+                        bullet.y > enemy.y && bullet.y < enemy.y + enemy.height) {
+                        enemy.health--;
+                        bullets.splice(index, 1);
+
+                        if (enemy.health <= 0) {
+                            enemies.splice(enemyIndex, 1);
+                            if (gameMode === 'pvp') {
+                                if (bullet.owner === player1) score1++;
+                                else score2++;
+                            } else {
+                                score1++;
+                            }
+                        }
+                    }
+                });
+
+                // PvP: Check player collisions
+                if (gameMode === 'pvp') {
+                    if (bullet.owner === player1 && player2.checkCollision(bullet)) {
+                        player2.health -= 10;
+                        bullets.splice(index, 1);
+                        score1 += 5;
+                        if (player2.health <= 0) endGame('Player 1 Wins!');
+                    } else if (bullet.owner === player2 && player1.checkCollision(bullet)) {
+                        player1.health -= 10;
+                        bullets.splice(index, 1);
+                        score2 += 5;
+                        if (player1.health <= 0) endGame('Player 2 Wins!');
+                    }
+                }
+            });
+
+            // Update enemies
+            enemies.forEach((enemy, index) => {
+                enemy.update();
+
+                // Remove off-screen enemies
+                if (enemy.y > canvas.height) {
+                    enemies.splice(index, 1);
+                    return;
+                }
+
+                // Check player collisions
+                if (player1.checkCollision(enemy)) {
+                    player1.health -= 5;
+                    enemies.splice(index, 1);
+                    if (gameMode === 'coop' && player1.health <= 0) {
+                        endGame(`Game Over! Wave ${wave} - Score: ${score1}`);
+                    }
+                }
+                if (player2.checkCollision(enemy)) {
+                    player2.health -= 5;
+                    enemies.splice(index, 1);
+                    if (gameMode === 'coop' && player2.health <= 0) {
+                        endGame(`Game Over! Wave ${wave} - Score: ${score1}`);
+                    }
+                }
+            });
+
+            // Update collectibles
+            collectibles.forEach((item, index) => {
+                if (player1.checkCollision(item) || player2.checkCollision(item)) {
+                    if (item.type === 'health') {
+                        player1.health = Math.min(100, player1.health + 20);
+                        player2.health = Math.min(100, player2.health + 20);
+                    } else {
+                        if (gameMode === 'pvp') {
+                            if (player1.checkCollision(item)) score1 += 10;
+                            else score2 += 10;
+                        } else {
+                            score1 += 10;
+                        }
+                    }
+                    collectibles.splice(index, 1);
+                }
+            });
+
+            // Spawn enemies
+            enemySpawnTimer++;
+            const spawnRate = gameMode === 'coop' ? Math.max(30, 80 - wave * 5) : 60;
+            if (enemySpawnTimer > spawnRate) {
+                spawnEnemy();
+                enemySpawnTimer = 0;
+            }
+
+            // Spawn collectibles
+            collectibleSpawnTimer++;
+            if (collectibleSpawnTimer > 180) {
+                spawnCollectible();
+                collectibleSpawnTimer = 0;
+            }
+
+            // Co-op: Wave progression
+            if (gameMode === 'coop' && score1 > wave * 10) {
+                wave++;
+            }
+
+            // Update UI
+            if (gameMode === 'pvp') {
+                document.getElementById('player1Score').textContent = `P1: ${score1}`;
+                document.getElementById('player2Score').textContent = `P2: ${score2}`;
+            } else {
+                document.getElementById('player1Score').textContent = `Wave: ${wave}`;
+                const avgHealth = Math.max(0, Math.round((player1.health + player2.health) / 2));
+                document.getElementById('player2Score').textContent = `Health: ${avgHealth}`;
+            }
+        }
+
+        function drawGame() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid background
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // Draw game objects
+            collectibles.forEach(item => item.draw());
+            enemies.forEach(enemy => enemy.draw());
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+            player1.draw();
+            player2.draw();
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(message) {
+            gameActive = false;
+            document.getElementById('gameOverText').textContent = message;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
