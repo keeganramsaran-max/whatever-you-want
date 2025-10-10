@@ -974,13 +974,14 @@
                     ctx.fillRect(axeX - 5, axeY - 3, 14, 8);
                 }
 
-                // Blocking shield effect
+                // Blocking shield effect (appears on front side)
                 if (this.isBlocking) {
+                    const shieldX = this.facingRight ? this.x + 5 : this.x + this.width - 20;
                     ctx.fillStyle = `rgba(255, 215, 0, ${0.3 + Math.sin(Date.now() / 100) * 0.2})`;
-                    ctx.fillRect(this.x + blockOffset - 5, this.y + 10 + blockCrouch, 15, 30);
+                    ctx.fillRect(shieldX, this.y + 10 + blockCrouch, 15, 30);
                     ctx.strokeStyle = '#FFD700';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(this.x + blockOffset - 5, this.y + 10 + blockCrouch, 15, 30);
+                    ctx.strokeRect(shieldX, this.y + 10 + blockCrouch, 15, 30);
                 }
 
                 // Legs
@@ -1008,14 +1009,21 @@
                 const attackThrust = this.isAttacking ? (this.attackFrame < 5 ? this.attackFrame * 3 : (10 - this.attackFrame) * 3) : 0;
                 const attackBob = this.isAttacking ? Math.sin(this.attackFrame / 2) * 3 : 0;
 
-                // Shield (left side when facing right)
+                // Shield (appears in front of character)
+                // Use facingRight to determine shield position and arc direction
+                const shieldX = this.facingRight ? this.x + 10 + attackThrust : this.x + this.width - 10 + attackThrust;
+                // When facing right: draw left half (from top to bottom)
+                // When facing left: draw right half (from bottom to top)
+                const shieldStartAngle = this.facingRight ? -Math.PI / 2 : Math.PI / 2;
+                const shieldEndAngle = this.facingRight ? Math.PI / 2 : -Math.PI / 2;
+
                 ctx.fillStyle = this.isBlocking ? '#00d4ff' : '#4444ff';
                 ctx.beginPath();
-                ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, shieldSize, -Math.PI / 2, Math.PI / 2);
+                ctx.arc(shieldX, this.y + this.height / 2 + shieldRaise, shieldSize, shieldStartAngle, shieldEndAngle);
                 ctx.fill();
                 ctx.fillStyle = '#ffcc00';
                 ctx.beginPath();
-                ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, 8, 0, Math.PI * 2);
+                ctx.arc(shieldX, this.y + this.height / 2 + shieldRaise, 8, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Shield blocking glow
@@ -1023,7 +1031,7 @@
                     ctx.strokeStyle = `rgba(0, 212, 255, ${0.7 + Math.sin(Date.now() / 80) * 0.3})`;
                     ctx.lineWidth = 3 + blockGlow;
                     ctx.beginPath();
-                    ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, shieldSize + 5, -Math.PI / 2, Math.PI / 2);
+                    ctx.arc(shieldX, this.y + this.height / 2 + shieldRaise, shieldSize + 5, shieldStartAngle, shieldEndAngle);
                     ctx.stroke();
                 }
 
@@ -1039,19 +1047,28 @@
                 ctx.fillStyle = '#111111';
                 ctx.fillRect(this.x + this.width / 2 - 6, this.y + 12 + attackBob, 12, 4);
 
-                // Arms
+                // Arms - positioned based on facing direction
                 ctx.fillStyle = '#2244aa';
-                // Right arm (sword arm) - thrust forward on attack
-                ctx.fillRect(this.x + this.width - 18 + attackThrust, this.y + 23 + animBounce + attackBob, 10, 22);
-                // Left arm (shield arm) - follows shield
-                ctx.fillRect(this.x + 8 + attackThrust * 0.5, this.y + 23 - animBounce + shieldRaise + attackBob, 10, 22);
+                if (this.facingRight) {
+                    // Right arm (sword arm) - thrust forward on attack
+                    ctx.fillRect(this.x + this.width - 18 + attackThrust, this.y + 23 + animBounce + attackBob, 10, 22);
+                    // Left arm (shield arm) - follows shield
+                    ctx.fillRect(this.x + 8 + attackThrust * 0.5, this.y + 23 - animBounce + shieldRaise + attackBob, 10, 22);
+                } else {
+                    // Facing left - arms reversed
+                    // Left arm (sword arm) - thrust forward on attack
+                    ctx.fillRect(this.x + 8 + attackThrust, this.y + 23 + animBounce + attackBob, 10, 22);
+                    // Right arm (shield arm) - follows shield
+                    ctx.fillRect(this.x + this.width - 18 + attackThrust * 0.5, this.y + 23 - animBounce + shieldRaise + attackBob, 10, 22);
+                }
 
-                // Sword (visible during attack)
+                // Sword (visible during attack) - positioned based on facing
                 if (this.isAttacking) {
                     ctx.fillStyle = '#cccccc';
-                    ctx.fillRect(this.x + this.width - 8 + attackThrust, this.y + 25 + attackBob, 4, 25);
+                    const swordX = this.facingRight ? this.x + this.width - 8 + attackThrust : this.x + 4 + attackThrust;
+                    ctx.fillRect(swordX, this.y + 25 + attackBob, 4, 25);
                     ctx.fillStyle = '#8B7500';
-                    ctx.fillRect(this.x + this.width - 10 + attackThrust, this.y + 24 + attackBob, 8, 4);
+                    ctx.fillRect(swordX - 2, this.y + 24 + attackBob, 8, 4);
                 }
 
                 // Legs - wider stance when blocking
