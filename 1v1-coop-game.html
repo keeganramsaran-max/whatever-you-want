@@ -926,38 +926,68 @@
             drawBerserker() {
                 const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 3 : 0;
 
+                // Blocking stance - defensive posture
+                const blockOffset = this.isBlocking ? -8 : 0;
+                const blockCrouch = this.isBlocking ? 5 : 0;
+
+                // Attack animation - swing motion
+                const attackSwing = this.isAttacking ? (this.attackFrame < 5 ? -this.attackFrame * 4 : (10 - this.attackFrame) * 4) : 0;
+                const attackLunge = this.isAttacking && this.attackFrame < 5 ? this.attackFrame * 2 : 0;
+
                 // Muscular body - darker red
                 ctx.fillStyle = '#cc0000';
-                ctx.fillRect(this.x + 10, this.y + 15, this.width - 20, this.height - 30);
+                ctx.fillRect(this.x + 10 + attackLunge, this.y + 15 + blockCrouch, this.width - 20, this.height - 30 - blockCrouch);
 
                 // Head
                 ctx.fillStyle = '#ffccaa';
                 ctx.beginPath();
-                ctx.arc(this.x + this.width / 2, this.y + 12, 12, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width / 2 + attackLunge, this.y + 12 + blockCrouch, 12, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Angry eyes
                 ctx.fillStyle = '#ff0000';
-                ctx.fillRect(this.x + this.width / 2 + 3, this.y + 10, 4, 3);
+                ctx.fillRect(this.x + this.width / 2 + 3 + attackLunge, this.y + 10 + blockCrouch, 4, 3);
 
                 // Arms - animated
                 ctx.fillStyle = '#ffccaa';
-                const armSwing = this.isAttacking ? -20 : animBounce;
-                ctx.fillRect(this.x + this.width - 15, this.y + 20 + armSwing, 8, 25);
-                ctx.fillRect(this.x + 7, this.y + 20 - animBounce, 8, 25);
+                const armSwing = this.isAttacking ? attackSwing : animBounce;
+
+                // Right arm (attack arm)
+                ctx.fillRect(this.x + this.width - 15 + attackLunge, this.y + 20 + armSwing + blockCrouch, 8, 25);
+
+                // Left arm (block arm)
+                if (this.isBlocking) {
+                    // Raised defensive position
+                    ctx.fillRect(this.x + 7 + blockOffset, this.y + 15 + blockCrouch, 8, 20);
+                } else {
+                    ctx.fillRect(this.x + 7, this.y + 20 - animBounce + blockCrouch, 8, 25);
+                }
 
                 // Axe (weapon)
                 if (this.isAttacking) {
+                    // Draw axe without extra transform (since we're already in a flipped context)
+                    const axeX = this.x + this.width - 5 + attackLunge;
+                    const axeY = this.y + 25 + blockCrouch;
                     ctx.fillStyle = '#888888';
-                    ctx.fillRect(this.x + this.width - 5, this.y + 15, 4, 30);
+                    ctx.fillRect(axeX, axeY, 4, 30);
                     ctx.fillStyle = '#666666';
-                    ctx.fillRect(this.x + this.width - 10, this.y + 12, 14, 8);
+                    ctx.fillRect(axeX - 5, axeY - 3, 14, 8);
+                }
+
+                // Blocking shield effect
+                if (this.isBlocking) {
+                    ctx.fillStyle = `rgba(255, 215, 0, ${0.3 + Math.sin(Date.now() / 100) * 0.2})`;
+                    ctx.fillRect(this.x + blockOffset - 5, this.y + 10 + blockCrouch, 15, 30);
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(this.x + blockOffset - 5, this.y + 10 + blockCrouch, 15, 30);
                 }
 
                 // Legs
                 ctx.fillStyle = '#8B4513';
-                ctx.fillRect(this.x + 15, this.y + this.height - 15 + animBounce, 8, 15 - animBounce);
-                ctx.fillRect(this.x + this.width - 23, this.y + this.height - 15 - animBounce, 8, 15 + animBounce);
+                const legSpread = this.isBlocking ? 5 : 0;
+                ctx.fillRect(this.x + 15 - legSpread, this.y + this.height - 15 + animBounce + blockCrouch, 8, 15 - animBounce - blockCrouch);
+                ctx.fillRect(this.x + this.width - 23 + legSpread, this.y + this.height - 15 - animBounce + blockCrouch, 8, 15 + animBounce - blockCrouch);
 
                 // Rage indicator (glowing red when low HP)
                 if (this.health < this.maxHealth * 0.5) {
@@ -969,37 +999,66 @@
             drawDefender() {
                 const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 2 : 0;
 
+                // Blocking animation - shield raised high
+                const shieldRaise = this.isBlocking ? -10 : 0;
+                const shieldSize = this.isBlocking ? 20 : 15;
+                const blockGlow = this.isBlocking ? Math.sin(Date.now() / 100) * 5 : 0;
+
+                // Attack animation - shield bash forward
+                const attackThrust = this.isAttacking ? (this.attackFrame < 5 ? this.attackFrame * 3 : (10 - this.attackFrame) * 3) : 0;
+                const attackBob = this.isAttacking ? Math.sin(this.attackFrame / 2) * 3 : 0;
+
                 // Shield (left side when facing right)
                 ctx.fillStyle = this.isBlocking ? '#00d4ff' : '#4444ff';
                 ctx.beginPath();
-                ctx.arc(this.x + 10, this.y + this.height / 2, 15, -Math.PI / 2, Math.PI / 2);
+                ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, shieldSize, -Math.PI / 2, Math.PI / 2);
                 ctx.fill();
                 ctx.fillStyle = '#ffcc00';
                 ctx.beginPath();
-                ctx.arc(this.x + 10, this.y + this.height / 2, 8, 0, Math.PI * 2);
+                ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, 8, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Shield blocking glow
+                if (this.isBlocking) {
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${0.7 + Math.sin(Date.now() / 80) * 0.3})`;
+                    ctx.lineWidth = 3 + blockGlow;
+                    ctx.beginPath();
+                    ctx.arc(this.x + 10 + attackThrust, this.y + this.height / 2 + shieldRaise, shieldSize + 5, -Math.PI / 2, Math.PI / 2);
+                    ctx.stroke();
+                }
 
                 // Heavy armor body
                 ctx.fillStyle = '#2244aa';
-                ctx.fillRect(this.x + 12, this.y + 18, this.width - 24, this.height - 33);
+                ctx.fillRect(this.x + 12, this.y + 18 + attackBob, this.width - 24, this.height - 33 - attackBob);
 
                 // Head with helmet
                 ctx.fillStyle = '#3355bb';
-                ctx.fillRect(this.x + this.width / 2 - 10, this.y + 5, 20, 18);
+                ctx.fillRect(this.x + this.width / 2 - 10, this.y + 5 + attackBob, 20, 18);
 
                 // Helmet visor
                 ctx.fillStyle = '#111111';
-                ctx.fillRect(this.x + this.width / 2 - 6, this.y + 12, 12, 4);
+                ctx.fillRect(this.x + this.width / 2 - 6, this.y + 12 + attackBob, 12, 4);
 
                 // Arms
                 ctx.fillStyle = '#2244aa';
-                ctx.fillRect(this.x + this.width - 18, this.y + 23 + animBounce, 10, 22);
-                ctx.fillRect(this.x + 8, this.y + 23 - animBounce, 10, 22);
+                // Right arm (sword arm) - thrust forward on attack
+                ctx.fillRect(this.x + this.width - 18 + attackThrust, this.y + 23 + animBounce + attackBob, 10, 22);
+                // Left arm (shield arm) - follows shield
+                ctx.fillRect(this.x + 8 + attackThrust * 0.5, this.y + 23 - animBounce + shieldRaise + attackBob, 10, 22);
 
-                // Legs
+                // Sword (visible during attack)
+                if (this.isAttacking) {
+                    ctx.fillStyle = '#cccccc';
+                    ctx.fillRect(this.x + this.width - 8 + attackThrust, this.y + 25 + attackBob, 4, 25);
+                    ctx.fillStyle = '#8B7500';
+                    ctx.fillRect(this.x + this.width - 10 + attackThrust, this.y + 24 + attackBob, 8, 4);
+                }
+
+                // Legs - wider stance when blocking
                 ctx.fillStyle = '#1a3380';
-                ctx.fillRect(this.x + 18, this.y + this.height - 15 + animBounce, 10, 15 - animBounce);
-                ctx.fillRect(this.x + this.width - 28, this.y + this.height - 15 - animBounce, 10, 15 + animBounce);
+                const blockStance = this.isBlocking ? 3 : 0;
+                ctx.fillRect(this.x + 18 - blockStance, this.y + this.height - 15 + animBounce, 10, 15 - animBounce);
+                ctx.fillRect(this.x + this.width - 28 + blockStance, this.y + this.height - 15 - animBounce, 10, 15 + animBounce);
 
                 // Super armor glow
                 if (this.specialActive) {
@@ -1013,36 +1072,92 @@
                 const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 80) * 4 : 0;
                 const crouchOffset = this.isAttacking ? 5 : 0;
 
+                // Blocking animation - defensive crouch with crossed daggers
+                const blockCrouch = this.isBlocking ? 8 : 0;
+                const blockCross = this.isBlocking ? -5 : 0;
+
+                // Attack animation - rapid slash
+                const attackSlash = this.isAttacking ? (this.attackFrame < 5 ? this.attackFrame * 5 : (10 - this.attackFrame) * 5) : 0;
+                const attackBlur = this.isAttacking && this.attackFrame < 5 ? this.attackFrame * 2 : 0;
+
                 // Ninja body - sleek
                 ctx.fillStyle = '#6633cc';
-                ctx.fillRect(this.x + 12, this.y + 15 + crouchOffset, this.width - 24, this.height - 28 - crouchOffset);
+                ctx.fillRect(this.x + 12, this.y + 15 + crouchOffset + blockCrouch, this.width - 24, this.height - 28 - crouchOffset - blockCrouch);
 
                 // Head with mask
                 ctx.fillStyle = '#111111';
-                ctx.fillRect(this.x + this.width / 2 - 9, this.y + 8, 18, 16);
+                ctx.fillRect(this.x + this.width / 2 - 9, this.y + 8 + blockCrouch, 18, 16);
 
-                // Eyes
-                ctx.fillStyle = '#ff0000';
-                ctx.fillRect(this.x + this.width / 2 + 2, this.y + 13, 5, 2);
+                // Eyes - glow brighter when blocking
+                ctx.fillStyle = this.isBlocking ? '#ff6666' : '#ff0000';
+                ctx.fillRect(this.x + this.width / 2 + 2, this.y + 13 + blockCrouch, 5, 2);
 
                 // Arms - fast motion
                 ctx.fillStyle = '#6633cc';
-                const armSpeed = this.isAttacking ? -15 : animBounce * 2;
-                ctx.fillRect(this.x + this.width - 16, this.y + 18 + crouchOffset + armSpeed, 7, 20);
-                ctx.fillRect(this.x + 9, this.y + 18 + crouchOffset - armSpeed, 7, 20);
+                let armSpeed;
+                if (this.isBlocking) {
+                    // Arms crossed in front
+                    armSpeed = blockCross;
+                    ctx.fillRect(this.x + this.width / 2 - 8, this.y + 20 + blockCrouch, 7, 18);
+                    ctx.fillRect(this.x + this.width / 2 + 1, this.y + 20 + blockCrouch, 7, 18);
+                } else if (this.isAttacking) {
+                    armSpeed = -attackSlash;
+                    // Attack motion with blur
+                    ctx.globalAlpha = 0.5;
+                    ctx.fillRect(this.x + this.width - 16 + attackBlur, this.y + 18 + crouchOffset + armSpeed - 10, 7, 20);
+                    ctx.globalAlpha = 1.0;
+                    ctx.fillRect(this.x + this.width - 16 + attackBlur, this.y + 18 + crouchOffset + armSpeed, 7, 20);
+                    ctx.fillRect(this.x + 9, this.y + 18 + crouchOffset - armSpeed, 7, 20);
+                } else {
+                    armSpeed = animBounce * 2;
+                    ctx.fillRect(this.x + this.width - 16, this.y + 18 + crouchOffset + armSpeed, 7, 20);
+                    ctx.fillRect(this.x + 9, this.y + 18 + crouchOffset - armSpeed, 7, 20);
+                }
 
                 // Dual daggers
-                if (this.isAttacking) {
+                if (this.isBlocking) {
+                    // Crossed daggers for blocking - simplified without rotation
+                    const centerX = this.x + this.width / 2;
+                    const centerY = this.y + 25 + blockCrouch;
+
+                    // Left dagger (angled)
                     ctx.fillStyle = '#cccccc';
-                    ctx.fillRect(this.x + this.width - 8, this.y + 15, 3, 15);
+                    ctx.fillRect(centerX - 8, centerY, 3, 12);
                     ctx.fillStyle = '#ffdd00';
-                    ctx.fillRect(this.x + this.width - 8, this.y + 14, 3, 3);
+                    ctx.fillRect(centerX - 8, centerY, 3, 3);
+
+                    // Right dagger (angled)
+                    ctx.fillStyle = '#cccccc';
+                    ctx.fillRect(centerX + 5, centerY, 3, 12);
+                    ctx.fillStyle = '#ffdd00';
+                    ctx.fillRect(centerX + 5, centerY, 3, 3);
+
+                    // Blocking spark effect
+                    ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(Date.now() / 80) * 0.3})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY + 6, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.isAttacking) {
+                    // Slashing dagger
+                    ctx.fillStyle = '#cccccc';
+                    ctx.fillRect(this.x + this.width - 8 + attackBlur, this.y + 15 + armSpeed, 3, 15);
+                    ctx.fillStyle = '#ffdd00';
+                    ctx.fillRect(this.x + this.width - 8 + attackBlur, this.y + 14 + armSpeed, 3, 3);
+
+                    // Slash trail
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${1 - this.attackFrame / 10})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width - 8, this.y + 20);
+                    ctx.lineTo(this.x + this.width - 8 + attackSlash, this.y + 20 + attackSlash);
+                    ctx.stroke();
                 }
 
                 // Legs - fast stance
                 ctx.fillStyle = '#4422aa';
-                ctx.fillRect(this.x + 14, this.y + this.height - 13 + animBounce + crouchOffset, 7, 13 - animBounce);
-                ctx.fillRect(this.x + this.width - 21, this.y + this.height - 13 - animBounce + crouchOffset, 7, 13 + animBounce);
+                const legStance = this.isBlocking ? 7 : 0;
+                ctx.fillRect(this.x + 14 - legStance, this.y + this.height - 13 + animBounce + crouchOffset + blockCrouch, 7, 13 - animBounce - blockCrouch);
+                ctx.fillRect(this.x + this.width - 21 + legStance, this.y + this.height - 13 - animBounce + crouchOffset + blockCrouch, 7, 13 + animBounce - blockCrouch);
 
                 // Speed trail when moving fast
                 if (Math.abs(this.velocityX) > 3) {
@@ -1064,10 +1179,18 @@
                 const animFloat = Math.sin(Date.now() / 300) * 3;
                 const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 2 : 0;
 
+                // Blocking animation - magical barrier forms
+                const blockFloat = this.isBlocking ? Math.sin(Date.now() / 100) * 5 : 0;
+                const blockGlow = this.isBlocking ? 0.6 + Math.sin(Date.now() / 80) * 0.3 : 0;
+
+                // Attack animation - staff swing
+                const attackSwing = this.isAttacking ? (this.attackFrame < 5 ? this.attackFrame * 6 : (10 - this.attackFrame) * 6) : 0;
+                const attackReach = this.isAttacking && this.attackFrame < 5 ? this.attackFrame * 3 : 0;
+
                 // Robed body
                 ctx.fillStyle = '#00aaaa';
                 ctx.beginPath();
-                ctx.moveTo(this.x + this.width / 2, this.y + 12);
+                ctx.moveTo(this.x + this.width / 2, this.y + 12 + animFloat);
                 ctx.lineTo(this.x + this.width - 8, this.y + this.height - 5);
                 ctx.lineTo(this.x + 8, this.y + this.height - 5);
                 ctx.closePath();
@@ -1094,25 +1217,74 @@
                 ctx.arc(this.x + this.width / 2 + 5, this.y + 5 + animFloat, 2, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Eyes
-                ctx.fillStyle = '#0066ff';
+                // Eyes - glow during block
+                ctx.fillStyle = this.isBlocking ? '#00ffff' : '#0066ff';
                 ctx.fillRect(this.x + this.width / 2 + 2, this.y + 10 + animFloat, 3, 3);
+                if (this.isBlocking) {
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                    ctx.fillRect(this.x + this.width / 2 + 1, this.y + 9 + animFloat, 5, 5);
+                }
 
                 // Staff
+                const staffX = this.x + this.width - 10;
+                const staffY = this.y + 38 + animBounce;
                 ctx.fillStyle = '#8B4513';
-                ctx.fillRect(this.x + this.width - 12, this.y + 18 + animBounce, 4, 40);
+                ctx.fillRect(staffX - 2, staffY - 20, 4, 40);
 
                 // Staff orb
-                ctx.fillStyle = this.specialChargeTimer > 0 ? '#ffff00' : '#00ffff';
-                ctx.beginPath();
-                ctx.arc(this.x + this.width - 10, this.y + 15 + animBounce, 6, 0, Math.PI * 2);
-                ctx.fill();
+                if (this.isAttacking) {
+                    ctx.fillStyle = '#ff6600';
+                    ctx.beginPath();
+                    ctx.arc(staffX, staffY - 26, 6 + attackSwing / 5, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = this.specialChargeTimer > 0 ? '#ffff00' : '#00ffff';
+                    ctx.beginPath();
+                    ctx.arc(staffX, staffY - 26, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Magical barrier when blocking
+                if (this.isBlocking) {
+                    // Outer hexagonal barrier
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${blockGlow})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    const sides = 6;
+                    const radius = 35 + blockFloat;
+                    for (let i = 0; i <= sides; i++) {
+                        const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+                        const x = this.x + this.width / 2 + Math.cos(angle) * radius;
+                        const y = this.y + this.height / 2 + Math.sin(angle) * radius;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+
+                    // Inner glow
+                    ctx.fillStyle = `rgba(0, 255, 255, ${blockGlow * 0.2})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 30, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Runic symbols rotating around
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (Date.now() / 1000 + i * Math.PI / 2) % (Math.PI * 2);
+                        const symX = this.x + this.width / 2 + Math.cos(angle) * 25;
+                        const symY = this.y + this.height / 2 + Math.sin(angle) * 25;
+                        ctx.fillStyle = `rgba(0, 255, 255, ${blockGlow})`;
+                        ctx.font = 'bold 10px Arial';
+                        ctx.fillText('*', symX, symY);
+                    }
+                }
 
                 // Magic particles floating around
-                for (let i = 0; i < 3; i++) {
-                    const particleX = this.x + this.width / 2 + Math.sin(Date.now() / 200 + i * 2) * 20;
+                const particleCount = this.isAttacking ? 6 : 3;
+                for (let i = 0; i < particleCount; i++) {
+                    const particleX = this.x + this.width / 2 + Math.sin(Date.now() / 200 + i * 2) * (20 + attackReach);
                     const particleY = this.y + 20 + Math.cos(Date.now() / 200 + i * 2) * 15;
-                    ctx.fillStyle = `rgba(0, 255, 255, ${0.3 + Math.sin(Date.now() / 100 + i) * 0.2})`;
+                    const particleColor = this.isAttacking ? 'rgba(255, 100, 0,' : 'rgba(0, 255, 255,';
+                    ctx.fillStyle = `${particleColor} ${0.3 + Math.sin(Date.now() / 100 + i) * 0.2})`;
                     ctx.beginPath();
                     ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
                     ctx.fill();
@@ -1126,6 +1298,16 @@
                     ctx.beginPath();
                     ctx.arc(this.x + this.width / 2, this.y + this.height / 2, radius, 0, Math.PI * 2);
                     ctx.stroke();
+                }
+
+                // Attack magic projectile effect
+                if (this.isAttacking && this.attackFrame < 6) {
+                    const projectileX = this.x + this.width + attackReach;
+                    const projectileY = this.y + this.height / 2;
+                    ctx.fillStyle = `rgba(255, 100, 0, ${1 - this.attackFrame / 6})`;
+                    ctx.beginPath();
+                    ctx.arc(projectileX, projectileY, 8 + this.attackFrame, 0, Math.PI * 2);
+                    ctx.fill();
                 }
             }
         }
