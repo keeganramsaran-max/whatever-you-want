@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1v1 / Co-op Arena Game</title>
+    <title>Arena Fighter - 1v1</title>
     <style>
         * {
             margin: 0;
@@ -21,12 +21,13 @@
             overflow: hidden;
         }
 
-        #menu {
+        #characterSelect {
             background: rgba(255, 255, 255, 0.95);
             padding: 40px;
             border-radius: 20px;
             text-align: center;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
         }
 
         h1 {
@@ -35,36 +36,73 @@
             font-size: 2.5em;
         }
 
-        .mode-btn {
-            display: block;
-            width: 100%;
-            padding: 20px;
-            margin: 15px 0;
-            font-size: 1.3em;
+        .player-selection {
+            display: inline-block;
+            width: 45%;
+            margin: 10px;
+            vertical-align: top;
+        }
+
+        .player-selection h2 {
+            color: #764ba2;
+            margin-bottom: 15px;
+        }
+
+        .character-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .character-btn {
+            padding: 15px;
+            font-size: 1em;
+            font-weight: bold;
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .character-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .character-btn.selected {
+            border-color: #FFD700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .character-info {
+            font-size: 0.75em;
+            margin-top: 5px;
+            opacity: 0.8;
+        }
+
+        #startBtn {
+            margin-top: 30px;
+            padding: 20px 60px;
+            font-size: 1.5em;
             font-weight: bold;
             border: none;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
-            color: white;
-        }
-
-        .pvp-btn {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            transition: all 0.3s;
         }
 
-        .pvp-btn:hover {
+        #startBtn:hover:not(:disabled) {
             transform: scale(1.05);
             box-shadow: 0 5px 20px rgba(245, 87, 108, 0.4);
         }
 
-        .coop-btn {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-
-        .coop-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(79, 172, 254, 0.4);
+        #startBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         #gameContainer {
@@ -76,27 +114,141 @@
             border: 5px solid rgba(255, 255, 255, 0.3);
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            background: #1a1a2e;
         }
 
         #ui {
             position: absolute;
-            top: 20px;
+            top: 0;
             left: 0;
             right: 0;
+            padding: 20px;
+        }
+
+        .player-ui {
             display: flex;
-            justify-content: space-between;
-            padding: 0 30px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .player-ui.p1 {
+            justify-content: flex-start;
+        }
+
+        .player-ui.p2 {
+            justify-content: flex-end;
+        }
+
+        .player-name {
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 0 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            min-width: 120px;
+        }
+
+        .health-container {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 0, 0, 0.3);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .health-fill {
+            height: 100%;
+            transition: width 0.3s;
+            background: linear-gradient(90deg, #ff0000, #ff6b6b);
+        }
+
+        .block-counter {
+            display: flex;
+            gap: 3px;
+            margin-top: 5px;
+        }
+
+        .block-pip {
+            width: 20px;
+            height: 8px;
+            background: rgba(100, 200, 255, 0.3);
+            border-radius: 2px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .block-pip.active {
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            box-shadow: 0 0 5px rgba(79, 172, 254, 0.8);
+        }
+
+        .round-info {
+            text-align: center;
             color: white;
             font-size: 1.5em;
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
+            margin: 10px 0;
         }
 
-        .score {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 10px 20px;
+        .wins-display {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            margin-top: 5px;
+        }
+
+        .win-circles {
+            display: flex;
+            gap: 10px;
+        }
+
+        .win-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .win-circle.won {
+            background: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
             border-radius: 10px;
+            color: white;
+            font-size: 0.9em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        #roundTransition {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 60px 100px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            z-index: 1000;
         }
 
         #gameOver {
@@ -106,16 +258,17 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(255, 255, 255, 0.95);
-            padding: 40px;
+            padding: 40px 60px;
             border-radius: 20px;
             text-align: center;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
         }
 
         #gameOver h2 {
             color: #667eea;
             margin-bottom: 20px;
-            font-size: 2em;
+            font-size: 2.5em;
         }
 
         #restartBtn {
@@ -135,41 +288,92 @@
             transform: scale(1.05);
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
         }
-
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px 25px;
-            border-radius: 10px;
-            color: white;
-            font-size: 0.9em;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
     </style>
 </head>
 <body>
-    <div id="menu">
-        <h1>🎮 Arena Battle</h1>
-        <button class="mode-btn pvp-btn" onclick="startGame('pvp')">⚔️ 1v1 Mode</button>
-        <button class="mode-btn coop-btn" onclick="startGame('coop')">🤝 Co-op Mode</button>
-        <p style="margin-top: 20px; color: #666;">
-            <strong>1v1:</strong> Compete for points!<br>
-            <strong>Co-op:</strong> Survive waves together!
-        </p>
+    <div id="characterSelect">
+        <h1>Arena Fighter</h1>
+
+        <div class="player-selection">
+            <h2>Player 1</h2>
+            <div class="character-grid">
+                <button class="character-btn" data-player="1" data-character="berserker">
+                    Berserker
+                    <div class="character-info">High HP, Rage</div>
+                </button>
+                <button class="character-btn" data-player="1" data-character="defender">
+                    Defender
+                    <div class="character-info">Tank, Shield</div>
+                </button>
+                <button class="character-btn" data-player="1" data-character="assassin">
+                    Assassin
+                    <div class="character-info">Fast, Crits</div>
+                </button>
+                <button class="character-btn" data-player="1" data-character="summoner">
+                    Summoner
+                    <div class="character-info">Blizzard</div>
+                </button>
+            </div>
+        </div>
+
+        <div class="player-selection">
+            <h2>Player 2</h2>
+            <div class="character-grid">
+                <button class="character-btn" data-player="2" data-character="berserker">
+                    Berserker
+                    <div class="character-info">High HP, Rage</div>
+                </button>
+                <button class="character-btn" data-player="2" data-character="defender">
+                    Defender
+                    <div class="character-info">Tank, Shield</div>
+                </button>
+                <button class="character-btn" data-player="2" data-character="assassin">
+                    Assassin
+                    <div class="character-info">Fast, Crits</div>
+                </button>
+                <button class="character-btn" data-player="2" data-character="summoner">
+                    Summoner
+                    <div class="character-info">Blizzard</div>
+                </button>
+            </div>
+        </div>
+
+        <button id="startBtn" disabled>START FIGHT</button>
     </div>
 
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas" width="1200" height="600"></canvas>
         <div id="ui">
-            <div class="score" id="player1Score">P1: 0</div>
-            <div class="score" id="player2Score">P2: 0</div>
+            <div class="player-ui p1">
+                <div class="player-name" id="p1Name">Player 1</div>
+                <div class="health-container">
+                    <div class="health-bar">
+                        <div class="health-fill" id="p1Health" style="width: 100%"></div>
+                    </div>
+                    <div class="block-counter" id="p1Block"></div>
+                </div>
+            </div>
+            <div class="round-info">
+                <div id="roundNumber">Round 1</div>
+                <div class="wins-display">
+                    <div class="win-circles" id="p1Wins"></div>
+                    <div class="win-circles" id="p2Wins"></div>
+                </div>
+            </div>
+            <div class="player-ui p2">
+                <div class="health-container">
+                    <div class="health-bar">
+                        <div class="health-fill" id="p2Health" style="width: 100%"></div>
+                    </div>
+                    <div class="block-counter" id="p2Block"></div>
+                </div>
+                <div class="player-name" id="p2Name">Player 2</div>
+            </div>
         </div>
         <div class="controls">
-            P1: WASD to move, SPACE to shoot | P2: Arrow keys to move, ENTER to shoot
+            P1: W (jump), A/D (move), C (block), V (attack) | P2: ↑ (jump), ←/→ (move), J (block), K (attack)
         </div>
+        <div id="roundTransition"></div>
         <div id="gameOver">
             <h2 id="gameOverText"></h2>
             <button id="restartBtn" onclick="location.reload()">Play Again</button>
@@ -179,313 +383,892 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gameMode = null;
-        let gameActive = false;
+
+        // Character data
+        const CHARACTERS = {
+            berserker: {
+                name: 'Berserker',
+                maxHealth: 150,
+                damageTaken: 1.5,
+                movementSpeed: 2.5,
+                attackSpeed: 30, // frames between attacks (0.5 seconds at 60fps)
+                baseDamage: 10,
+                rageDamagePerHP: 0.2, // +1 damage per 5 HP lost
+                color: '#ff4444',
+                width: 50,
+                height: 70
+            },
+            defender: {
+                name: 'Defender',
+                maxHealth: 130,
+                damageTaken: 1.0,
+                movementSpeed: 2,
+                attackSpeed: 30,
+                baseDamage: 15,
+                blockRegen: 0.3,
+                color: '#4444ff',
+                width: 55,
+                height: 75
+            },
+            assassin: {
+                name: 'Assassin',
+                maxHealth: 75,
+                damageTaken: 1.0,
+                movementSpeed: 4,
+                attackSpeed: 30,
+                baseDamage: 12,
+                critChance: 0.25,
+                critMultiplier: 2.5,
+                color: '#9944ff',
+                width: 45,
+                height: 65
+            },
+            summoner: {
+                name: 'Summoner',
+                maxHealth: 95,
+                damageTaken: 1.0,
+                movementSpeed: 2.5,
+                attackSpeed: 30,
+                baseDamage: 20,
+                color: '#44ffff',
+                width: 48,
+                height: 68
+            }
+        };
 
         // Game state
+        let selectedP1 = null;
+        let selectedP2 = null;
         let player1 = null;
         let player2 = null;
-        let bullets = [];
-        let enemies = [];
-        let collectibles = [];
-        let score1 = 0;
-        let score2 = 0;
-        let wave = 1;
-        let enemySpawnTimer = 0;
-        let collectibleSpawnTimer = 0;
+        let gameActive = false;
+        let roundNumber = 1;
+        let p1Wins = 0;
+        let p2Wins = 0;
+        let effects = [];
 
         // Input handling
         const keys = {};
-        window.addEventListener('keydown', (e) => keys[e.key] = true);
-        window.addEventListener('keyup', (e) => keys[e.key] = false);
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Character selection
+        document.querySelectorAll('.character-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const player = btn.dataset.player;
+                const character = btn.dataset.character;
+
+                // Remove previous selection
+                document.querySelectorAll(`.character-btn[data-player="${player}"]`).forEach(b => {
+                    b.classList.remove('selected');
+                });
+
+                // Add new selection
+                btn.classList.add('selected');
+
+                if (player === '1') selectedP1 = character;
+                if (player === '2') selectedP2 = character;
+
+                // Enable start button if both selected
+                if (selectedP1 && selectedP2) {
+                    document.getElementById('startBtn').disabled = false;
+                }
+            });
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
 
         // Player class
         class Player {
-            constructor(x, y, color, controls) {
+            constructor(x, y, characterType, controls, playerNum) {
+                const char = CHARACTERS[characterType];
+                this.characterType = characterType;
+                this.playerNum = playerNum;
                 this.x = x;
                 this.y = y;
-                this.width = 30;
-                this.height = 30;
-                this.color = color;
-                this.speed = 4;
+                this.width = char.width;
+                this.height = char.height;
+                this.color = char.color;
+
+                // Stats
+                this.maxHealth = char.maxHealth;
+                this.health = char.maxHealth;
+                this.damageTakenMultiplier = char.damageTaken;
+                this.speed = char.movementSpeed;
+                this.attackSpeed = char.attackSpeed;
+                this.baseDamage = char.baseDamage;
+
+                // Physics
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.onGround = false;
+                this.gravity = 0.5;
+                this.jumpPower = -10;
+
+                // Combat
                 this.controls = controls;
-                this.shootCooldown = 0;
-                this.health = 100;
-            }
+                this.facingRight = playerNum === 1;
+                this.attackCooldown = 0;
+                this.blockCounter = 5;
+                this.blockRegenTimer = 0;
+                this.isBlocking = false;
+                this.isAttacking = false;
+                this.attackFrame = 0;
+                this.comboCounter = 0;
+                this.comboTimer = 0;
+                this.stunned = false;
+                this.stunnedTimer = 0;
+                this.attackButtonPressed = false;
 
-            update() {
-                // Movement
-                if (keys[this.controls.up] && this.y > 0) this.y -= this.speed;
-                if (keys[this.controls.down] && this.y < canvas.height - this.height) this.y += this.speed;
-                if (keys[this.controls.left] && this.x > 0) this.x -= this.speed;
-                if (keys[this.controls.right] && this.x < canvas.width - this.width) this.x += this.speed;
+                // Special attack
+                this.specialChargeTimer = 0;
+                this.specialActive = false;
+                this.specialTimer = 0;
+                this.invincible = false;
+                this.damageDuringInvincibility = 0;
 
-                // Shooting
-                if (this.shootCooldown > 0) this.shootCooldown--;
-                if (keys[this.controls.shoot] && this.shootCooldown === 0) {
-                    this.shoot();
-                    this.shootCooldown = 20;
+                // Character specific
+                if (characterType === 'defender') {
+                    this.blockRegenRate = char.blockRegen;
+                } else {
+                    this.blockRegenRate = 0.5;
+                }
+
+                if (characterType === 'assassin') {
+                    this.dashAvailable = false;
+                    this.dashCooldown = 0;
                 }
             }
 
-            shoot() {
-                bullets.push({
+            update(opponent) {
+                // Stun handling
+                if (this.stunned) {
+                    this.stunnedTimer--;
+                    if (this.stunnedTimer <= 0) {
+                        this.stunned = false;
+                    }
+                    this.velocityX *= 0.9;
+                } else {
+                    // Movement
+                    if (!this.isAttacking && !this.specialActive) {
+                        if (keys[this.controls.left]) {
+                            this.velocityX = -this.speed;
+                            this.facingRight = false;
+                        } else if (keys[this.controls.right]) {
+                            this.velocityX = this.speed;
+                            this.facingRight = true;
+                        } else {
+                            this.velocityX *= 0.8;
+                        }
+
+                        // Jump
+                        if (keys[this.controls.up] && this.onGround) {
+                            this.velocityY = this.jumpPower;
+                            this.onGround = false;
+                        }
+                    }
+
+                    // Blocking
+                    if (keys[this.controls.block] && this.blockCounter > 0 && !this.isAttacking) {
+                        this.isBlocking = true;
+                    } else {
+                        this.isBlocking = false;
+                    }
+
+                    // Attack
+                    if (this.attackCooldown > 0) {
+                        this.attackCooldown--;
+                    }
+
+                    // Check for special attack charge
+                    if (this.health <= this.maxHealth * 0.25 && !this.specialActive) {
+                        if (keys[this.controls.attack]) {
+                            this.specialChargeTimer++;
+                            if (this.specialChargeTimer >= 90) { // 1.5 seconds at 60fps
+                                this.activateSpecial();
+                                this.specialChargeTimer = 0;
+                            }
+                        } else {
+                            this.specialChargeTimer = 0;
+                        }
+                    } else {
+                        this.specialChargeTimer = 0;
+                    }
+
+                    // Regular attack (only if not charging special)
+                    // Must release and press attack button (can't hold)
+                    if (keys[this.controls.attack] && this.attackCooldown === 0 && !this.isBlocking && this.specialChargeTimer === 0 && !this.attackButtonPressed) {
+                        this.attack(opponent);
+                        this.attackButtonPressed = true;
+                    } else if (!keys[this.controls.attack]) {
+                        this.attackButtonPressed = false;
+                    }
+                }
+
+                // Handle special attack timers
+                if (this.specialActive) {
+                    this.specialTimer--;
+                    if (this.specialTimer <= 0) {
+                        this.deactivateSpecial();
+                    }
+
+                    // Assassin dash
+                    if (this.characterType === 'assassin' && this.dashAvailable) {
+                        if (keys[this.controls.block] && this.dashCooldown === 0) {
+                            this.dash(opponent);
+                        }
+                        if (this.dashCooldown > 0) {
+                            this.dashCooldown--;
+                        }
+                    }
+                }
+
+                // Attack animation
+                if (this.isAttacking) {
+                    this.attackFrame++;
+                    if (this.attackFrame > 10) {
+                        this.isAttacking = false;
+                        this.attackFrame = 0;
+                    }
+                }
+
+                // Block regeneration
+                if (!this.isBlocking && this.blockCounter < 5) {
+                    this.blockRegenTimer++;
+                    const regenFrames = this.blockRegenRate * 60; // Convert seconds to frames
+                    if (this.blockRegenTimer >= regenFrames) {
+                        this.blockCounter++;
+                        this.blockRegenTimer = 0;
+                    }
+                }
+
+                // Combo timer
+                if (this.comboTimer > 0) {
+                    this.comboTimer--;
+                    if (this.comboTimer === 0) {
+                        this.comboCounter = 0;
+                    }
+                }
+
+                // Apply gravity
+                this.velocityY += this.gravity;
+
+                // Update position
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Ground collision
+                const groundY = canvas.height - 100 - this.height;
+                if (this.y >= groundY) {
+                    this.y = groundY;
+                    this.velocityY = 0;
+                    this.onGround = true;
+                } else {
+                    this.onGround = false;
+                }
+
+                // Wall collision
+                if (this.x < 0) this.x = 0;
+                if (this.x > canvas.width - this.width) this.x = canvas.width - this.width;
+            }
+
+            attack(opponent) {
+                this.isAttacking = true;
+                this.attackFrame = 0;
+                this.attackCooldown = this.attackSpeed;
+
+                // Calculate damage
+                let damage = this.baseDamage;
+
+                // Berserker rage damage
+                if (this.characterType === 'berserker') {
+                    const healthLost = this.maxHealth - this.health;
+                    damage = this.baseDamage + (healthLost * CHARACTERS.berserker.rageDamagePerHP);
+                }
+
+                // Assassin crit
+                if (this.characterType === 'assassin') {
+                    if (Math.random() < CHARACTERS.assassin.critChance) {
+                        damage *= CHARACTERS.assassin.critMultiplier;
+                        this.createCritEffect();
+                    }
+                }
+
+                // Check if hit connects
+                const attackRange = this.facingRight ? 60 : -60;
+                const attackX = this.x + (this.facingRight ? this.width : 0) + attackRange / 2;
+                const attackY = this.onGround ? this.y + this.height / 2 : this.y + this.height;
+
+                if (this.checkHit(opponent, attackX, attackY, Math.abs(attackRange), 40)) {
+                    // Check if opponent is blocking
+                    if (opponent.isBlocking && opponent.blockCounter > 0) {
+                        opponent.blockCounter--;
+                        opponent.blockRegenTimer = 0;
+
+                        if (opponent.blockCounter === 0) {
+                            opponent.blockCounter = 0;
+                            opponent.stunned = true;
+                            opponent.stunnedTimer = 120; // 2 seconds
+                        }
+
+                        // Reset this player's combo
+                        this.comboCounter = 0;
+                    } else {
+                        // Deal damage
+                        opponent.takeDamage(damage);
+
+                        // Apply knockback
+                        const knockbackDirection = this.facingRight ? 1 : -1;
+                        opponent.velocityX = knockbackDirection * 8;
+                        if (opponent.onGround) {
+                            opponent.velocityY = -5; // Slight upward bounce
+                        }
+
+                        // Combo system
+                        this.comboCounter++;
+                        this.comboTimer = 30; // 0.5 seconds
+
+                        if (this.comboCounter >= 3) {
+                            opponent.stunned = true;
+                            opponent.stunnedTimer = 90; // 1.5 seconds
+                            this.comboCounter = 0;
+                        }
+                    }
+                }
+            }
+
+            activateSpecial() {
+                this.specialActive = true;
+                this.specialTimer = 240; // 4 seconds
+
+                if (this.characterType === 'berserker') {
+                    this.invincible = true;
+                    this.damageDuringInvincibility = 0;
+                } else if (this.characterType === 'defender') {
+                    // Super armor - handled in takeDamage
+                } else if (this.characterType === 'assassin') {
+                    this.dashAvailable = true;
+                } else if (this.characterType === 'summoner') {
+                    this.castBlizzard();
+                }
+            }
+
+            deactivateSpecial() {
+                this.specialActive = false;
+
+                if (this.characterType === 'berserker') {
+                    this.invincible = false;
+                    const backlashDamage = this.damageDuringInvincibility * 1.5;
+                    this.health -= backlashDamage;
+                    if (this.health < 0) this.health = 0;
+                    this.damageDuringInvincibility = 0;
+                } else if (this.characterType === 'assassin') {
+                    this.dashAvailable = false;
+                }
+            }
+
+            dash(opponent) {
+                this.dashCooldown = 10; // Very short delay
+                this.invincible = true;
+
+                // Dash toward opponent
+                const directionX = opponent.x > this.x ? 1 : -1;
+                const dashDistance = 150;
+                const targetX = this.x + (directionX * dashDistance);
+
+                // Animate dash
+                this.x = targetX;
+
+                // Check if hit opponent
+                if (this.checkCollision(opponent)) {
+                    opponent.stunned = true;
+                    opponent.stunnedTimer = 60; // 1 second
+                }
+
+                setTimeout(() => {
+                    this.invincible = false;
+                }, 100);
+            }
+
+            castBlizzard() {
+                // Create blizzard effect (limited range, not full screen)
+                const blizzardRange = 300; // Limited distance
+                const blizzard = {
+                    x: this.facingRight ? this.x + this.width : Math.max(0, this.x - blizzardRange),
+                    y: 0,
+                    width: blizzardRange,
+                    height: canvas.height,
+                    damage: 20, // Reduced from 30
+                    stunDuration: 45, // Reduced from 90 (0.75 seconds instead of 1.5)
+                    caster: this
+                };
+
+                effects.push({
+                    type: 'blizzard',
+                    data: blizzard,
+                    duration: 30
+                });
+
+                this.specialActive = false;
+                this.specialTimer = 0;
+            }
+
+            takeDamage(damage) {
+                if (this.invincible) {
+                    if (this.characterType === 'berserker') {
+                        this.damageDuringInvincibility += damage * this.damageTakenMultiplier;
+                    }
+                    return;
+                }
+
+                let actualDamage = damage * this.damageTakenMultiplier;
+
+                // Defender super armor
+                if (this.characterType === 'defender' && this.specialActive) {
+                    actualDamage *= 0.25; // 75% reduction
+                }
+
+                this.health -= actualDamage;
+                if (this.health < 0) this.health = 0;
+
+                // Reset opponent's combo timer on counterattack
+                this.comboTimer = 0;
+            }
+
+            checkHit(target, x, y, width, height) {
+                return x < target.x + target.width &&
+                       x + width > target.x &&
+                       y < target.y + target.height &&
+                       y + height > target.y;
+            }
+
+            checkCollision(other) {
+                return this.x < other.x + other.width &&
+                       this.x + this.width > other.x &&
+                       this.y < other.y + other.height &&
+                       this.y + this.height > other.y;
+            }
+
+            createCritEffect() {
+                effects.push({
+                    type: 'crit',
                     x: this.x + this.width / 2,
                     y: this.y,
-                    width: 5,
-                    height: 10,
-                    speed: -7,
-                    color: this.color,
-                    owner: this
+                    duration: 30
                 });
             }
 
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.save();
 
-                // Health bar
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-                ctx.fillRect(this.x, this.y - 10, this.width, 5);
-                ctx.fillStyle = 'red';
-                ctx.fillRect(this.x, this.y - 10, this.width * (this.health / 100), 5);
+                // Stun effect
+                if (this.stunned) {
+                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.3;
+                }
+
+                // Invincibility effect
+                if (this.invincible) {
+                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.5;
+                }
+
+                // Special charge effect
+                if (this.specialChargeTimer > 0) {
+                    const chargePercent = this.specialChargeTimer / 90;
+                    ctx.fillStyle = `rgba(255, 255, 0, ${chargePercent * 0.5})`;
+                    ctx.fillRect(this.x - 5, this.y - 5, this.width + 10, this.height + 10);
+                }
+
+                // Flip context if facing left
+                if (!this.facingRight) {
+                    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+                    ctx.scale(-1, 1);
+                    ctx.translate(-(this.x + this.width / 2), -(this.y + this.height / 2));
+                }
+
+                // Draw character based on type
+                if (this.characterType === 'berserker') {
+                    this.drawBerserker();
+                } else if (this.characterType === 'defender') {
+                    this.drawDefender();
+                } else if (this.characterType === 'assassin') {
+                    this.drawAssassin();
+                } else if (this.characterType === 'summoner') {
+                    this.drawSummoner();
+                }
+
+                // Attack effects
+                if (this.isAttacking && this.attackFrame < 5) {
+                    ctx.restore();
+                    ctx.save();
+                    const attackRange = 70;
+                    const attackX = this.facingRight ? this.x + this.width : this.x - attackRange;
+                    const attackY = this.onGround ? this.y + this.height / 3 : this.y + this.height / 2;
+
+                    // Attack slash effect
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${1 - this.attackFrame / 5})`;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(attackX + attackRange / 2, attackY + 20, 30, -0.5, 0.5, false);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
             }
 
-            checkCollision(obj) {
-                return this.x < obj.x + obj.width &&
-                       this.x + this.width > obj.x &&
-                       this.y < obj.y + obj.height &&
-                       this.y + this.height > obj.y;
-            }
-        }
+            drawBerserker() {
+                const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 3 : 0;
 
-        // Enemy class
-        class Enemy {
-            constructor(x, y, type = 'normal') {
-                this.x = x;
-                this.y = y;
-                this.width = 25;
-                this.height = 25;
-                this.type = type;
-                this.speed = type === 'fast' ? 3 : 1.5;
-                this.health = type === 'tank' ? 3 : 1;
-                this.color = type === 'tank' ? '#8B0000' : type === 'fast' ? '#FF6B6B' : '#FF0000';
-            }
+                // Muscular body - darker red
+                ctx.fillStyle = '#cc0000';
+                ctx.fillRect(this.x + 10, this.y + 15, this.width - 20, this.height - 30);
 
-            update() {
-                this.y += this.speed;
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
+                // Head
+                ctx.fillStyle = '#ffccaa';
                 ctx.beginPath();
-                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width / 2, this.y + 12, 12, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Angry eyes
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(this.x + this.width / 2 + 3, this.y + 10, 4, 3);
+
+                // Arms - animated
+                ctx.fillStyle = '#ffccaa';
+                const armSwing = this.isAttacking ? -20 : animBounce;
+                ctx.fillRect(this.x + this.width - 15, this.y + 20 + armSwing, 8, 25);
+                ctx.fillRect(this.x + 7, this.y + 20 - animBounce, 8, 25);
+
+                // Axe (weapon)
+                if (this.isAttacking) {
+                    ctx.fillStyle = '#888888';
+                    ctx.fillRect(this.x + this.width - 5, this.y + 15, 4, 30);
+                    ctx.fillStyle = '#666666';
+                    ctx.fillRect(this.x + this.width - 10, this.y + 12, 14, 8);
+                }
+
+                // Legs
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(this.x + 15, this.y + this.height - 15 + animBounce, 8, 15 - animBounce);
+                ctx.fillRect(this.x + this.width - 23, this.y + this.height - 15 - animBounce, 8, 15 + animBounce);
+
+                // Rage indicator (glowing red when low HP)
+                if (this.health < this.maxHealth * 0.5) {
+                    ctx.fillStyle = `rgba(255, 0, 0, ${0.3 + Math.sin(Date.now() / 200) * 0.2})`;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
             }
 
-            checkCollision(obj) {
-                return this.x < obj.x + obj.width &&
-                       this.x + this.width > obj.x &&
-                       this.y < obj.y + obj.height &&
-                       this.y + this.height > obj.y;
-            }
-        }
+            drawDefender() {
+                const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 2 : 0;
 
-        // Collectible class
-        class Collectible {
-            constructor(x, y, type) {
-                this.x = x;
-                this.y = y;
-                this.width = 20;
-                this.height = 20;
-                this.type = type; // 'health' or 'point'
-                this.color = type === 'health' ? '#00FF00' : '#FFD700';
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
+                // Shield (left side when facing right)
+                ctx.fillStyle = this.isBlocking ? '#00d4ff' : '#4444ff';
                 ctx.beginPath();
-                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+                ctx.arc(this.x + 10, this.y + this.height / 2, 15, -Math.PI / 2, Math.PI / 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath();
+                ctx.arc(this.x + 10, this.y + this.height / 2, 8, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Symbol
-                ctx.fillStyle = 'white';
-                ctx.font = '14px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(this.type === 'health' ? '+' : '★', this.x + this.width/2, this.y + this.height/2 + 5);
+                // Heavy armor body
+                ctx.fillStyle = '#2244aa';
+                ctx.fillRect(this.x + 12, this.y + 18, this.width - 24, this.height - 33);
+
+                // Head with helmet
+                ctx.fillStyle = '#3355bb';
+                ctx.fillRect(this.x + this.width / 2 - 10, this.y + 5, 20, 18);
+
+                // Helmet visor
+                ctx.fillStyle = '#111111';
+                ctx.fillRect(this.x + this.width / 2 - 6, this.y + 12, 12, 4);
+
+                // Arms
+                ctx.fillStyle = '#2244aa';
+                ctx.fillRect(this.x + this.width - 18, this.y + 23 + animBounce, 10, 22);
+                ctx.fillRect(this.x + 8, this.y + 23 - animBounce, 10, 22);
+
+                // Legs
+                ctx.fillStyle = '#1a3380';
+                ctx.fillRect(this.x + 18, this.y + this.height - 15 + animBounce, 10, 15 - animBounce);
+                ctx.fillRect(this.x + this.width - 28, this.y + this.height - 15 - animBounce, 10, 15 + animBounce);
+
+                // Super armor glow
+                if (this.specialActive) {
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${0.5 + Math.sin(Date.now() / 100) * 0.3})`;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(this.x, this.y, this.width, this.height);
+                }
             }
 
-            checkCollision(obj) {
-                return this.x < obj.x + obj.width &&
-                       this.x + this.width > obj.x &&
-                       this.y < obj.y + obj.height &&
-                       this.y + this.height > obj.y;
+            drawAssassin() {
+                const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 80) * 4 : 0;
+                const crouchOffset = this.isAttacking ? 5 : 0;
+
+                // Ninja body - sleek
+                ctx.fillStyle = '#6633cc';
+                ctx.fillRect(this.x + 12, this.y + 15 + crouchOffset, this.width - 24, this.height - 28 - crouchOffset);
+
+                // Head with mask
+                ctx.fillStyle = '#111111';
+                ctx.fillRect(this.x + this.width / 2 - 9, this.y + 8, 18, 16);
+
+                // Eyes
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(this.x + this.width / 2 + 2, this.y + 13, 5, 2);
+
+                // Arms - fast motion
+                ctx.fillStyle = '#6633cc';
+                const armSpeed = this.isAttacking ? -15 : animBounce * 2;
+                ctx.fillRect(this.x + this.width - 16, this.y + 18 + crouchOffset + armSpeed, 7, 20);
+                ctx.fillRect(this.x + 9, this.y + 18 + crouchOffset - armSpeed, 7, 20);
+
+                // Dual daggers
+                if (this.isAttacking) {
+                    ctx.fillStyle = '#cccccc';
+                    ctx.fillRect(this.x + this.width - 8, this.y + 15, 3, 15);
+                    ctx.fillStyle = '#ffdd00';
+                    ctx.fillRect(this.x + this.width - 8, this.y + 14, 3, 3);
+                }
+
+                // Legs - fast stance
+                ctx.fillStyle = '#4422aa';
+                ctx.fillRect(this.x + 14, this.y + this.height - 13 + animBounce + crouchOffset, 7, 13 - animBounce);
+                ctx.fillRect(this.x + this.width - 21, this.y + this.height - 13 - animBounce + crouchOffset, 7, 13 + animBounce);
+
+                // Speed trail when moving fast
+                if (Math.abs(this.velocityX) > 3) {
+                    ctx.fillStyle = `rgba(153, 68, 255, 0.3)`;
+                    ctx.fillRect(this.x - 10, this.y, 5, this.height);
+                }
+
+                // Crit glow
+                if (this.attackFrame < 10 && this.attackFrame > 0) {
+                    const glowSize = Math.random() * 20;
+                    ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, glowSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            drawSummoner() {
+                const animFloat = Math.sin(Date.now() / 300) * 3;
+                const animBounce = Math.abs(this.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 2 : 0;
+
+                // Robed body
+                ctx.fillStyle = '#00aaaa';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 2, this.y + 12);
+                ctx.lineTo(this.x + this.width - 8, this.y + this.height - 5);
+                ctx.lineTo(this.x + 8, this.y + this.height - 5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Head
+                ctx.fillStyle = '#ffddbb';
+                ctx.beginPath();
+                ctx.arc(this.x + this.width / 2, this.y + 12 + animFloat, 11, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wizard hat
+                ctx.fillStyle = '#006666';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 2, this.y + animFloat - 8);
+                ctx.lineTo(this.x + this.width / 2 + 15, this.y + 12 + animFloat);
+                ctx.lineTo(this.x + this.width / 2 - 15, this.y + 12 + animFloat);
+                ctx.closePath();
+                ctx.fill();
+
+                // Hat stars
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(this.x + this.width / 2 + 5, this.y + 5 + animFloat, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = '#0066ff';
+                ctx.fillRect(this.x + this.width / 2 + 2, this.y + 10 + animFloat, 3, 3);
+
+                // Staff
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(this.x + this.width - 12, this.y + 18 + animBounce, 4, 40);
+
+                // Staff orb
+                ctx.fillStyle = this.specialChargeTimer > 0 ? '#ffff00' : '#00ffff';
+                ctx.beginPath();
+                ctx.arc(this.x + this.width - 10, this.y + 15 + animBounce, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Magic particles floating around
+                for (let i = 0; i < 3; i++) {
+                    const particleX = this.x + this.width / 2 + Math.sin(Date.now() / 200 + i * 2) * 20;
+                    const particleY = this.y + 20 + Math.cos(Date.now() / 200 + i * 2) * 15;
+                    ctx.fillStyle = `rgba(0, 255, 255, ${0.3 + Math.sin(Date.now() / 100 + i) * 0.2})`;
+                    ctx.beginPath();
+                    ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Casting animation
+                if (this.specialChargeTimer > 0) {
+                    const radius = (this.specialChargeTimer / 90) * 30;
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${0.5 + Math.sin(Date.now() / 50) * 0.3})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             }
         }
 
-        function startGame(mode) {
-            gameMode = mode;
-            gameActive = true;
-            document.getElementById('menu').style.display = 'none';
+        function startGame() {
+            document.getElementById('characterSelect').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
 
-            // Initialize players
-            player1 = new Player(100, 500, '#4facfe', {
-                up: 'w', down: 's', left: 'a', right: 'd', shoot: ' '
-            });
+            // Update UI
+            document.getElementById('p1Name').textContent = CHARACTERS[selectedP1].name;
+            document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
 
-            player2 = new Player(670, 500, '#f5576c', {
-                up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shoot: 'Enter'
-            });
+            // Create win circles
+            for (let i = 0; i < 2; i++) {
+                const p1Circle = document.createElement('div');
+                p1Circle.className = 'win-circle';
+                document.getElementById('p1Wins').appendChild(p1Circle);
 
-            if (gameMode === 'pvp') {
-                document.getElementById('player1Score').textContent = 'P1: 0';
-                document.getElementById('player2Score').textContent = 'P2: 0';
-            } else {
-                document.getElementById('player1Score').textContent = 'Wave: 1';
-                document.getElementById('player2Score').textContent = 'Lives: 100';
+                const p2Circle = document.createElement('div');
+                p2Circle.className = 'win-circle';
+                document.getElementById('p2Wins').appendChild(p2Circle);
             }
 
-            gameLoop();
+            startRound();
         }
 
-        function spawnEnemy() {
-            const x = Math.random() * (canvas.width - 25);
-            const types = ['normal', 'normal', 'fast', 'tank'];
-            const type = types[Math.floor(Math.random() * types.length)];
-            enemies.push(new Enemy(x, -25, type));
+        function startRound() {
+            // Create players
+            player1 = new Player(100, 300, selectedP1, {
+                up: 'w',
+                left: 'a',
+                right: 'd',
+                block: 'c',
+                attack: 'v'
+            }, 1);
+
+            player2 = new Player(1000, 300, selectedP2, {
+                up: 'arrowup',
+                left: 'arrowleft',
+                right: 'arrowright',
+                block: 'j',
+                attack: 'k'
+            }, 2);
+
+            effects = [];
+
+            // Show round transition
+            const roundText = roundNumber === 1 ? 'ROUND 1 - FIGHT!' :
+                              roundNumber === 2 ? 'ROUND 2 - FIGHT!' :
+                              'FINAL ROUND - FIGHT!';
+            showTransition(roundText);
+
+            setTimeout(() => {
+                gameActive = true;
+                gameLoop();
+            }, 2000);
         }
 
-        function spawnCollectible() {
-            const x = Math.random() * (canvas.width - 20);
-            const y = Math.random() * (canvas.height / 2);
-            const type = Math.random() > 0.5 ? 'health' : 'point';
-            collectibles.push(new Collectible(x, y, type));
+        function showTransition(text) {
+            const transition = document.getElementById('roundTransition');
+            transition.textContent = text;
+            transition.style.display = 'block';
+
+            setTimeout(() => {
+                transition.style.display = 'none';
+            }, 2000);
+        }
+
+        function endRound(winner) {
+            gameActive = false;
+
+            if (winner === 1) {
+                p1Wins++;
+                document.getElementById('p1Wins').children[p1Wins - 1].classList.add('won');
+            } else {
+                p2Wins++;
+                document.getElementById('p2Wins').children[p2Wins - 1].classList.add('won');
+            }
+
+            // Check for match winner
+            if (p1Wins === 2) {
+                setTimeout(() => endGame(CHARACTERS[selectedP1].name + ' Wins!'), 1000);
+            } else if (p2Wins === 2) {
+                setTimeout(() => endGame(CHARACTERS[selectedP2].name + ' Wins!'), 1000);
+            } else {
+                roundNumber++;
+                setTimeout(startRound, 2000);
+            }
+        }
+
+        function endGame(message) {
+            document.getElementById('gameOverText').textContent = message;
+            document.getElementById('gameOver').style.display = 'block';
         }
 
         function updateGame() {
-            // Update players
-            player1.update();
-            player2.update();
+            player1.update(player2);
+            player2.update(player1);
 
-            // Update bullets
-            bullets.forEach((bullet, index) => {
-                bullet.y += bullet.speed;
+            // Update effects
+            effects = effects.filter(effect => {
+                effect.duration--;
 
-                // Remove off-screen bullets
-                if (bullet.y < 0 || bullet.y > canvas.height) {
-                    bullets.splice(index, 1);
-                    return;
+                if (effect.type === 'blizzard' && effect.duration === 29) {
+                    // Apply blizzard damage
+                    const blizzard = effect.data;
+                    const target = blizzard.caster === player1 ? player2 : player1;
+
+                    // Blizzard is unblockable
+                    target.health -= blizzard.damage;
+                    target.stunned = true;
+                    target.stunnedTimer = blizzard.stunDuration;
                 }
 
-                // Check enemy collisions
-                enemies.forEach((enemy, enemyIndex) => {
-                    if (bullet.x > enemy.x && bullet.x < enemy.x + enemy.width &&
-                        bullet.y > enemy.y && bullet.y < enemy.y + enemy.height) {
-                        enemy.health--;
-                        bullets.splice(index, 1);
-
-                        if (enemy.health <= 0) {
-                            enemies.splice(enemyIndex, 1);
-                            if (gameMode === 'pvp') {
-                                if (bullet.owner === player1) score1++;
-                                else score2++;
-                            } else {
-                                score1++;
-                            }
-                        }
-                    }
-                });
-
-                // PvP: Check player collisions
-                if (gameMode === 'pvp') {
-                    if (bullet.owner === player1 && player2.checkCollision(bullet)) {
-                        player2.health -= 10;
-                        bullets.splice(index, 1);
-                        score1 += 5;
-                        if (player2.health <= 0) endGame('Player 1 Wins!');
-                    } else if (bullet.owner === player2 && player1.checkCollision(bullet)) {
-                        player1.health -= 10;
-                        bullets.splice(index, 1);
-                        score2 += 5;
-                        if (player1.health <= 0) endGame('Player 2 Wins!');
-                    }
-                }
+                return effect.duration > 0;
             });
-
-            // Update enemies
-            enemies.forEach((enemy, index) => {
-                enemy.update();
-
-                // Remove off-screen enemies
-                if (enemy.y > canvas.height) {
-                    enemies.splice(index, 1);
-                    return;
-                }
-
-                // Check player collisions
-                if (player1.checkCollision(enemy)) {
-                    player1.health -= 5;
-                    enemies.splice(index, 1);
-                    if (gameMode === 'coop' && player1.health <= 0) {
-                        endGame(`Game Over! Wave ${wave} - Score: ${score1}`);
-                    }
-                }
-                if (player2.checkCollision(enemy)) {
-                    player2.health -= 5;
-                    enemies.splice(index, 1);
-                    if (gameMode === 'coop' && player2.health <= 0) {
-                        endGame(`Game Over! Wave ${wave} - Score: ${score1}`);
-                    }
-                }
-            });
-
-            // Update collectibles
-            collectibles.forEach((item, index) => {
-                if (player1.checkCollision(item) || player2.checkCollision(item)) {
-                    if (item.type === 'health') {
-                        player1.health = Math.min(100, player1.health + 20);
-                        player2.health = Math.min(100, player2.health + 20);
-                    } else {
-                        if (gameMode === 'pvp') {
-                            if (player1.checkCollision(item)) score1 += 10;
-                            else score2 += 10;
-                        } else {
-                            score1 += 10;
-                        }
-                    }
-                    collectibles.splice(index, 1);
-                }
-            });
-
-            // Spawn enemies
-            enemySpawnTimer++;
-            const spawnRate = gameMode === 'coop' ? Math.max(30, 80 - wave * 5) : 60;
-            if (enemySpawnTimer > spawnRate) {
-                spawnEnemy();
-                enemySpawnTimer = 0;
-            }
-
-            // Spawn collectibles
-            collectibleSpawnTimer++;
-            if (collectibleSpawnTimer > 180) {
-                spawnCollectible();
-                collectibleSpawnTimer = 0;
-            }
-
-            // Co-op: Wave progression
-            if (gameMode === 'coop' && score1 > wave * 10) {
-                wave++;
-            }
 
             // Update UI
-            if (gameMode === 'pvp') {
-                document.getElementById('player1Score').textContent = `P1: ${score1}`;
-                document.getElementById('player2Score').textContent = `P2: ${score2}`;
-            } else {
-                document.getElementById('player1Score').textContent = `Wave: ${wave}`;
-                const avgHealth = Math.max(0, Math.round((player1.health + player2.health) / 2));
-                document.getElementById('player2Score').textContent = `Health: ${avgHealth}`;
+            const p1HealthPercent = (player1.health / player1.maxHealth) * 100;
+            const p2HealthPercent = (player2.health / player2.maxHealth) * 100;
+            document.getElementById('p1Health').style.width = p1HealthPercent + '%';
+            document.getElementById('p2Health').style.width = p2HealthPercent + '%';
+
+            // Update block counters
+            updateBlockUI('p1Block', player1.blockCounter);
+            updateBlockUI('p2Block', player2.blockCounter);
+
+            // Check for round end
+            if (player1.health <= 0) {
+                endRound(2);
+            } else if (player2.health <= 0) {
+                endRound(1);
+            }
+        }
+
+        function updateBlockUI(elementId, count) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const pip = document.createElement('div');
+                pip.className = 'block-pip';
+                if (i < count) pip.classList.add('active');
+                container.appendChild(pip);
             }
         }
 
@@ -494,29 +1277,43 @@
             ctx.fillStyle = '#1a1a2e';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw grid background
+            // Draw ground
+            ctx.fillStyle = '#2a2a3e';
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+
+            // Draw grid
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 40) {
+            for (let i = 0; i < canvas.width; i += 50) {
                 ctx.beginPath();
                 ctx.moveTo(i, 0);
                 ctx.lineTo(i, canvas.height);
                 ctx.stroke();
             }
-            for (let i = 0; i < canvas.height; i += 40) {
-                ctx.beginPath();
-                ctx.moveTo(0, i);
-                ctx.lineTo(canvas.width, i);
-                ctx.stroke();
-            }
 
-            // Draw game objects
-            collectibles.forEach(item => item.draw());
-            enemies.forEach(enemy => enemy.draw());
-            bullets.forEach(bullet => {
-                ctx.fillStyle = bullet.color;
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            // Draw effects
+            effects.forEach(effect => {
+                if (effect.type === 'blizzard') {
+                    const alpha = effect.duration / 30;
+                    ctx.fillStyle = `rgba(100, 200, 255, ${alpha * 0.3})`;
+                    ctx.fillRect(effect.data.x, effect.data.y, effect.data.width, effect.data.height);
+
+                    // Snow particles
+                    for (let i = 0; i < 50; i++) {
+                        const x = effect.data.x + Math.random() * effect.data.width;
+                        const y = Math.random() * canvas.height;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                        ctx.fillRect(x, y, 3, 3);
+                    }
+                } else if (effect.type === 'crit') {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('CRIT!', effect.x, effect.y - (30 - effect.duration));
+                }
             });
+
+            // Draw players
             player1.draw();
             player2.draw();
         }
@@ -527,12 +1324,6 @@
             updateGame();
             drawGame();
             requestAnimationFrame(gameLoop);
-        }
-
-        function endGame(message) {
-            gameActive = false;
-            document.getElementById('gameOverText').textContent = message;
-            document.getElementById('gameOver').style.display = 'block';
         }
     </script>
 </body>
