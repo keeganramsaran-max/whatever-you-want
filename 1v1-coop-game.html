@@ -21,7 +21,80 @@
             overflow: hidden;
         }
 
+        #modeSelect {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+        }
+
+        #difficultySelect {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+        }
+
+        .mode-btn {
+            padding: 30px 60px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 15px;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .difficulty-btn {
+            padding: 25px 50px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        .difficulty-btn.easy {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        }
+
+        .difficulty-btn.medium {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .difficulty-btn.impossible {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .difficulty-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .difficulty-info {
+            font-size: 0.7em;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
         #characterSelect {
+            display: none;
             background: rgba(255, 255, 255, 0.95);
             padding: 40px;
             border-radius: 20px;
@@ -291,10 +364,38 @@
     </style>
 </head>
 <body>
+    <div id="modeSelect">
+        <h1>Arena Fighter</h1>
+        <h2>Select Game Mode</h2>
+        <div>
+            <button class="mode-btn" onclick="selectMode('pvp')">Player vs Player</button>
+            <button class="mode-btn" onclick="selectMode('cpu')">Vs Computer</button>
+        </div>
+    </div>
+
+    <div id="difficultySelect">
+        <h1>Arena Fighter</h1>
+        <h2>Select Difficulty</h2>
+        <div>
+            <button class="difficulty-btn easy" onclick="selectDifficulty('easy')">
+                Easy
+                <div class="difficulty-info">Slow reactions, makes mistakes</div>
+            </button>
+            <button class="difficulty-btn medium" onclick="selectDifficulty('medium')">
+                Medium
+                <div class="difficulty-info">Human-like, sometimes messes up</div>
+            </button>
+            <button class="difficulty-btn impossible" onclick="selectDifficulty('impossible')">
+                Impossible
+                <div class="difficulty-info">Perfect reactions, no mistakes</div>
+            </button>
+        </div>
+    </div>
+
     <div id="characterSelect">
         <h1>Arena Fighter</h1>
 
-        <div class="player-selection">
+        <div class="player-selection" id="p1Selection">
             <h2>Player 1</h2>
             <div class="character-grid">
                 <button class="character-btn" data-player="1" data-character="berserker">
@@ -316,8 +417,8 @@
             </div>
         </div>
 
-        <div class="player-selection">
-            <h2>Player 2</h2>
+        <div class="player-selection" id="p2Selection">
+            <h2 id="p2Title">Player 2</h2>
             <div class="character-grid">
                 <button class="character-btn" data-player="2" data-character="berserker">
                     Berserker
@@ -390,53 +491,55 @@
                 name: 'Berserker',
                 maxHealth: 150,
                 damageTaken: 1.5,
-                movementSpeed: 3.2, // increased from 2.5
+                movementSpeed: 2.5,
                 attackSpeed: 50, // frames between attacks (~0.83 seconds at 60fps)
                 baseDamage: 10,
                 rageDamagePerHP: 0.2, // +1 damage per 5 HP lost
                 color: '#ff4444',
-                width: 70, // increased from 50
-                height: 95 // increased from 70
+                width: 50,
+                height: 70
             },
             defender: {
                 name: 'Defender',
                 maxHealth: 130,
                 damageTaken: 1.0,
-                movementSpeed: 2.6, // increased from 2
+                movementSpeed: 2,
                 attackSpeed: 55, // slower heavy attacks
                 baseDamage: 15,
                 blockRegen: 0.3,
                 color: '#4444ff',
-                width: 75, // increased from 55
-                height: 100 // increased from 75
+                width: 55,
+                height: 75
             },
             assassin: {
                 name: 'Assassin',
                 maxHealth: 75,
                 damageTaken: 1.0,
-                movementSpeed: 5.0, // increased from 4
+                movementSpeed: 4,
                 attackSpeed: 45, // fastest attacks but still slower than before
                 baseDamage: 12,
                 critChance: 0.25,
                 critMultiplier: 2.5,
                 color: '#9944ff',
-                width: 62, // increased from 45
-                height: 88 // increased from 65
+                width: 45,
+                height: 65
             },
             summoner: {
                 name: 'Summoner',
                 maxHealth: 95,
                 damageTaken: 1.0,
-                movementSpeed: 3.2, // increased from 2.5
+                movementSpeed: 2.5,
                 attackSpeed: 50,
                 baseDamage: 20,
                 color: '#44ffff',
-                width: 66, // increased from 48
-                height: 92 // increased from 68
+                width: 48,
+                height: 68
             }
         };
 
         // Game state
+        let gameMode = null; // 'pvp' or 'cpu'
+        let difficulty = null; // 'easy', 'medium', or 'impossible'
         let selectedP1 = null;
         let selectedP2 = null;
         let player1 = null;
@@ -446,6 +549,32 @@
         let p1Wins = 0;
         let p2Wins = 0;
         let effects = [];
+
+        // Mode selection
+        function selectMode(mode) {
+            gameMode = mode;
+            document.getElementById('modeSelect').style.display = 'none';
+
+            if (mode === 'cpu') {
+                // Show difficulty selection
+                document.getElementById('difficultySelect').style.display = 'block';
+            } else {
+                // PvP mode - go straight to character select
+                document.getElementById('characterSelect').style.display = 'block';
+            }
+        }
+
+        // Difficulty selection
+        function selectDifficulty(diff) {
+            difficulty = diff;
+            document.getElementById('difficultySelect').style.display = 'none';
+            document.getElementById('characterSelect').style.display = 'block';
+
+            // Hide player 2 selection and auto-select random character
+            document.getElementById('p2Selection').style.display = 'none';
+            const characters = ['berserker', 'defender', 'assassin', 'summoner'];
+            selectedP2 = characters[Math.floor(Math.random() * characters.length)];
+        }
 
         // Input handling
         const keys = {};
@@ -477,8 +606,10 @@
                 if (player === '1') selectedP1 = character;
                 if (player === '2') selectedP2 = character;
 
-                // Enable start button if both selected
+                // Enable start button if both selected (or if CPU mode and P1 selected)
                 if (selectedP1 && selectedP2) {
+                    document.getElementById('startBtn').disabled = false;
+                } else if (gameMode === 'cpu' && selectedP1) {
                     document.getElementById('startBtn').disabled = false;
                 }
             });
@@ -488,15 +619,55 @@
 
         // Player class
         class Player {
-            constructor(x, y, characterType, controls, playerNum) {
+            constructor(x, y, characterType, controls, playerNum, isAI = false, aiDifficulty = 'medium') {
                 const char = CHARACTERS[characterType];
                 this.characterType = characterType;
                 this.playerNum = playerNum;
+                this.isAI = isAI;
+                this.aiDifficulty = aiDifficulty;
                 this.x = x;
                 this.y = y;
                 this.width = char.width;
                 this.height = char.height;
                 this.color = char.color;
+
+                // AI properties
+                if (isAI) {
+                    this.aiDecisionTimer = 0;
+                    this.aiAction = null;
+                    this.aiTargetDistance = 150; // Preferred distance from opponent
+
+                    // Difficulty-based settings
+                    if (aiDifficulty === 'easy') {
+                        this.aiDecisionDelay = 45; // Slow reactions
+                        this.aiMistakeChance = 0.35; // 35% chance to make mistakes
+                        this.aiBlockChance = 0.4; // 40% chance to block
+                        this.aiAttackChance = 0.65; // 65% chance to attack when in range
+                        this.aiAggressiveness = 0.5; // Moderate aggression
+                        this.aiPrediction = false; // No prediction
+                    } else if (aiDifficulty === 'medium') {
+                        this.aiDecisionDelay = 20; // Good reactions
+                        this.aiMistakeChance = 0.15; // 15% chance to make mistakes
+                        this.aiBlockChance = 0.75; // 75% chance to block
+                        this.aiAttackChance = 0.85; // 85% chance to attack when in range
+                        this.aiAggressiveness = 0.7; // High aggression
+                        this.aiPrediction = true; // Predict player movement
+                    } else { // impossible
+                        this.aiDecisionDelay = 1; // Frame-perfect reactions
+                        this.aiMistakeChance = 0; // Never makes mistakes
+                        this.aiBlockChance = 1.0; // Always blocks perfectly
+                        this.aiAttackChance = 1.0; // Always attacks optimally
+                        this.aiAggressiveness = 1.0; // Maximum aggression
+                        this.aiPrediction = true; // Perfect prediction
+                        this.aiPerfectTiming = true; // Perfect attack timing
+                        this.aiInputReading = true; // Reads player inputs
+
+                        // Stat buffs for impossible difficulty
+                        this.speed *= 1.3; // 30% faster movement
+                        this.attackSpeed = Math.floor(this.attackSpeed * 0.7); // 30% faster attacks
+                        this.baseDamage *= 1.5; // 50% more damage
+                    }
+                }
 
                 // Stats
                 this.maxHealth = char.maxHealth;
@@ -548,7 +719,196 @@
                 }
             }
 
+            updateAI(opponent) {
+                // AI decision making - runs every frame for impossible, or based on delay
+                this.aiDecisionTimer++;
+
+                const shouldDecide = this.aiDifficulty === 'impossible' || this.aiDecisionTimer >= this.aiDecisionDelay;
+
+                if (shouldDecide) {
+                    if (this.aiDecisionTimer >= this.aiDecisionDelay) {
+                        this.aiDecisionTimer = 0;
+                    }
+
+                    const distanceX = Math.abs((this.x + this.width / 2) - (opponent.x + opponent.width / 2));
+                    const isLeftOfOpponent = (this.x + this.width / 2) < (opponent.x + opponent.width / 2);
+
+                    // Reset AI inputs
+                    keys[this.controls.left] = false;
+                    keys[this.controls.right] = false;
+                    keys[this.controls.up] = false;
+                    keys[this.controls.block] = false;
+                    keys[this.controls.attack] = false;
+
+                    // Check if AI makes a mistake this frame
+                    const makeMistake = Math.random() < this.aiMistakeChance;
+
+                    if (makeMistake) {
+                        // Make a random mistake
+                        const mistakeType = Math.random();
+                        if (mistakeType < 0.4) {
+                            // Do nothing (freeze up)
+                            return;
+                        } else if (mistakeType < 0.7) {
+                            // Move wrong direction
+                            if (isLeftOfOpponent) {
+                                keys[this.controls.left] = true;
+                            } else {
+                                keys[this.controls.right] = true;
+                            }
+                        } else {
+                            // Attack at wrong time
+                            if (this.attackCooldown === 0) {
+                                keys[this.controls.attack] = true;
+                            }
+                        }
+                        return;
+                    }
+
+                    // IMPOSSIBLE DIFFICULTY: Input reading and perfect play
+                    if (this.aiInputReading) {
+                        // Read opponent's inputs and react instantly
+                        const opponentControls = opponent.controls;
+
+                        // If opponent is trying to attack, block it perfectly
+                        if (keys[opponentControls.attack] && distanceX < 150) {
+                            if (this.blockCounter > 0) {
+                                keys[this.controls.block] = true;
+                            }
+                        }
+
+                        // If opponent is blocking, don't attack (wait for them to stop)
+                        if (opponent.isBlocking) {
+                            // Move closer while they're blocking
+                            if (distanceX > 50) {
+                                if (isLeftOfOpponent) {
+                                    keys[this.controls.right] = true;
+                                } else {
+                                    keys[this.controls.left] = true;
+                                }
+                            }
+                            return;
+                        }
+
+                        // Perfect attack timing - attack the instant they're NOT blocking
+                        if (!opponent.isBlocking && this.attackCooldown === 0 && distanceX < 130) {
+                            keys[this.controls.attack] = true;
+                            return;
+                        }
+
+                        // If opponent tries to jump, attack them during landing
+                        if (!opponent.onGround && this.attackCooldown === 0 && distanceX < 100) {
+                            keys[this.controls.attack] = true;
+                        }
+
+                        // Always stay at perfect attack range
+                        if (distanceX > 100) {
+                            if (isLeftOfOpponent) {
+                                keys[this.controls.right] = true;
+                            } else {
+                                keys[this.controls.left] = true;
+                            }
+                        } else if (distanceX < 70) {
+                            // Too close, create a bit of space
+                            if (isLeftOfOpponent) {
+                                keys[this.controls.left] = true;
+                            } else {
+                                keys[this.controls.right] = true;
+                            }
+                        }
+
+                        // Spam attacks when in perfect range
+                        if (distanceX >= 70 && distanceX <= 100 && this.attackCooldown === 0) {
+                            keys[this.controls.attack] = true;
+                        }
+
+                        return; // Skip normal AI logic
+                    }
+
+                    // NORMAL AI LOGIC (Easy/Medium)
+
+                    // PRIORITY 1: Block incoming attacks with perfect/near-perfect timing
+                    if (opponent.isAttacking && distanceX < 120) {
+                        if (this.blockCounter > 0 && Math.random() < this.aiBlockChance) {
+                            keys[this.controls.block] = true;
+                            return; // Focus on blocking
+                        }
+                    }
+
+                    // PRIORITY 2: Punish opponent when they're vulnerable
+                    if (!opponent.isAttacking && this.attackCooldown === 0 && distanceX < 100) {
+                        if (Math.random() < this.aiAttackChance) {
+                            keys[this.controls.attack] = true;
+                            return;
+                        }
+                    }
+
+                    // PRIORITY 3: Aggressive pursuit
+                    const aggressiveRange = this.aiDifficulty === 'medium' ? 150 : 120;
+
+                    if (distanceX > 60 && distanceX < aggressiveRange) {
+                        // Stay in attack range and attack aggressively
+                        if (this.attackCooldown === 0 && Math.random() < (this.aiAttackChance * 1.2)) {
+                            keys[this.controls.attack] = true;
+                        }
+
+                        // Move to optimal attack distance (closer)
+                        if (distanceX > 90) {
+                            if (isLeftOfOpponent) {
+                                keys[this.controls.right] = true;
+                            } else {
+                                keys[this.controls.left] = true;
+                            }
+                        }
+                    } else if (distanceX <= 60) {
+                        // Very close - spam attacks
+                        if (this.attackCooldown === 0 && Math.random() < (this.aiAttackChance * 1.5)) {
+                            keys[this.controls.attack] = true;
+                        } else if (this.blockCounter > 0 && opponent.isAttacking) {
+                            keys[this.controls.block] = true;
+                        }
+                    } else {
+                        // Too far - rush toward opponent aggressively
+                        if (isLeftOfOpponent) {
+                            keys[this.controls.right] = true;
+                        } else {
+                            keys[this.controls.left] = true;
+                        }
+
+                        // Attack while closing distance if possible
+                        if (this.attackCooldown === 0 && distanceX < 150 && Math.random() < 0.3) {
+                            keys[this.controls.attack] = true;
+                        }
+                    }
+
+                    // Jump tactics
+                    if (this.onGround) {
+                        // Jump to avoid attacks or close distance
+                        const jumpChance = this.aiDifficulty === 'medium' ? 0.15 : 0.1;
+
+                        if (opponent.isAttacking && distanceX < 100 && Math.random() < jumpChance * 2) {
+                            keys[this.controls.up] = true; // Jump to evade
+                        } else if (distanceX > 150 && Math.random() < jumpChance) {
+                            keys[this.controls.up] = true; // Jump while approaching
+                        }
+                    }
+
+                    // Use special attack more aggressively at low health
+                    if (this.health <= this.maxHealth * 0.25 && !this.specialActive) {
+                        const specialChance = this.aiDifficulty === 'medium' ? 0.5 : 0.3;
+                        if (Math.random() < specialChance) {
+                            keys[this.controls.attack] = true;
+                        }
+                    }
+                }
+            }
+
             update(opponent) {
+                // AI control
+                if (this.isAI) {
+                    this.updateAI(opponent);
+                }
+
                 // Auto-face opponent based on position
                 if (this.x + this.width / 2 < opponent.x + opponent.width / 2) {
                     // This character is to the left of opponent, face right
@@ -875,12 +1235,6 @@
 
             draw() {
                 ctx.save();
-
-                // Scale entire character by 1.4x (40% larger)
-                const scaleAmount = 1.4;
-                ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-                ctx.scale(scaleAmount, scaleAmount);
-                ctx.translate(-(this.x + this.width / 2), -(this.y + this.height / 2));
 
                 // Stun effect
                 if (this.stunned) {
@@ -1831,7 +2185,11 @@
 
             // Update UI
             document.getElementById('p1Name').textContent = CHARACTERS[selectedP1].name;
-            document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
+            if (gameMode === 'cpu') {
+                document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name + ' (CPU)';
+            } else {
+                document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
+            }
 
             // Create win circles
             for (let i = 0; i < 2; i++) {
@@ -1855,15 +2213,17 @@
                 right: 'd',
                 block: 'c',
                 attack: 'v'
-            }, 1);
+            }, 1, false, 'medium');
 
+            // Create player 2 or AI
+            const isP2AI = gameMode === 'cpu';
             player2 = new Player(1000, 300, selectedP2, {
                 up: 'arrowup',
                 left: 'arrowleft',
                 right: 'arrowright',
                 block: 'j',
                 attack: 'k'
-            }, 2);
+            }, 2, isP2AI, difficulty || 'medium');
 
             effects = [];
 
