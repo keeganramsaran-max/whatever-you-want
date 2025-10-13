@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena Fighter - Wave Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Menu Screens */
+        #playerCountSelect,
+        #modeSelect,
+        #characterSelect {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+        }
+
+        #modeSelect,
+        #characterSelect {
+            display: none;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 2.5em;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        .menu-btn {
+            padding: 30px 60px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 15px;
+            transition: all 0.3s;
+        }
+
+        .menu-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .character-btn {
+            padding: 20px;
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .character-btn:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+        }
+
+        .character-btn.selected {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        }
+
+        .character-btn .char-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .character-btn .char-stats {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .player-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        #startBtn {
+            margin-top: 20px;
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        }
+
+        #startBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Game Canvas */
+        #gameCanvas {
+            display: none;
+            border: 3px solid #333;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Game UI */
+        #gameUI {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .ui-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .health-bar-container {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .player-name {
+            color: white;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .health-bar {
+            height: 30px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ff6666);
+            transition: width 0.3s;
+        }
+
+        .health-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .wave-counter {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 30px;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        /* Game Over Screen */
+        #gameOver {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 60px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameOver h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #ff4444;
+        }
+
+        #gameOver .wave-result {
+            font-size: 2em;
+            margin: 20px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- Player Count Selection -->
+    <div id="playerCountSelect">
+        <h1>Arena Fighter - Wave Mode</h1>
+        <h2>Select Number of Players</h2>
+        <button class="menu-btn" onclick="selectPlayerCount(1)">1 Player</button>
+        <button class="menu-btn" onclick="selectPlayerCount(2)">2 Players</button>
+    </div>
+
+    <!-- Mode Selection -->
+    <div id="modeSelect">
+        <h1>Select Game Mode</h1>
+        <div id="modeButtons"></div>
+        <button class="menu-btn" onclick="backToPlayerCount()" style="background: linear-gradient(135deg, #ff6b6b, #ee5a6f);">Back</button>
+    </div>
+
+    <!-- Character Selection -->
+    <div id="characterSelect">
+        <h1>Select Your Characters</h1>
+        <div class="player-section" id="p1Section">
+            <h2>Player 1</h2>
+            <div class="character-grid" id="p1Characters"></div>
+        </div>
+        <div class="player-section" id="p2Section" style="display: none;">
+            <h2>Player 2</h2>
+            <div class="character-grid" id="p2Characters"></div>
+        </div>
+        <button class="menu-btn" id="startBtn" onclick="startGame()" disabled>Start Wave Mode</button>
+        <button class="menu-btn" onclick="backToModeSelect()" style="background: linear-gradient(135deg, #ff6b6b, #ee5a6f);">Back</button>
+    </div>
+
+    <!-- Game UI -->
+    <div id="gameUI">
+        <div class="ui-top">
+            <div class="health-bar-container">
+                <div class="player-name">Player 1</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="p1HealthFill" style="width: 100%"></div>
+                    <div class="health-text" id="p1HealthText">100 / 100</div>
+                </div>
+            </div>
+            <div class="wave-counter">Wave: <span id="waveNumber">1</span></div>
+            <div class="health-bar-container" id="p2HealthContainer" style="display: none;">
+                <div class="player-name">Player 2</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="p2HealthFill" style="width: 100%"></div>
+                    <div class="health-text" id="p2HealthText">100 / 100</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" width="1200" height="700"></canvas>
+
+    <!-- Game Over Screen -->
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <div class="wave-result">You reached Wave <span id="finalWave">1</span></div>
+        <button class="menu-btn" onclick="restartGame()">Restart</button>
+        <button class="menu-btn" onclick="backToMenu()" style="background: linear-gradient(135deg, #ff6b6b, #ee5a6f);">Main Menu</button>
+    </div>
+
+    <script>
+        // Game State
+        let playerCount = 1;
+        let gameMode = 'wave';
+        let selectedP1 = null;
+        let selectedP2 = null;
+        let gameRunning = false;
+        let currentWave = 1;
+        let player1, player2;
+        let enemies = [];
+        let healthPickups = [];
+        let waveEnemiesSpawned = 0;
+        let waveEnemiesTotal = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 300; // frames between spawns
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Character Definitions
+        const CHARACTERS = {
+            berserker: {
+                name: 'Berserker',
+                maxHealth: 150,
+                damageTaken: 1.5,
+                movementSpeed: 2.5,
+                attackSpeed: 50,
+                baseDamage: 10,
+                rageDamagePerHP: 0.2,
+                color: '#ff4444',
+                width: 50,
+                height: 70
+            },
+            defender: {
+                name: 'Defender',
+                maxHealth: 130,
+                damageTaken: 1.0,
+                movementSpeed: 2,
+                attackSpeed: 55,
+                baseDamage: 15,
+                blockRegen: 0.3,
+                color: '#4444ff',
+                width: 55,
+                height: 75
+            },
+            assassin: {
+                name: 'Assassin',
+                maxHealth: 75,
+                damageTaken: 1.0,
+                movementSpeed: 4,
+                attackSpeed: 45,
+                baseDamage: 12,
+                critChance: 0.25,
+                critMultiplier: 2.5,
+                color: '#9944ff',
+                width: 45,
+                height: 65
+            },
+            summoner: {
+                name: 'Summoner',
+                maxHealth: 95,
+                damageTaken: 1.0,
+                movementSpeed: 2.5,
+                attackSpeed: 50,
+                baseDamage: 20,
+                color: '#44ffff',
+                width: 48,
+                height: 68
+            }
+        };
+
+        // Keyboard State
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Menu Functions
+        function selectPlayerCount(count) {
+            playerCount = count;
+            document.getElementById('playerCountSelect').style.display = 'none';
+            document.getElementById('modeSelect').style.display = 'block';
+            showModeOptions();
+        }
+
+        function showModeOptions() {
+            const modeButtons = document.getElementById('modeButtons');
+            modeButtons.innerHTML = '';
+
+            if (playerCount === 1) {
+                // 1 Player options
+                const waveBtn = document.createElement('button');
+                waveBtn.className = 'menu-btn';
+                waveBtn.textContent = 'Wave Mode';
+                waveBtn.onclick = () => selectMode('wave');
+                modeButtons.appendChild(waveBtn);
+
+                const cpuBtn = document.createElement('button');
+                cpuBtn.className = 'menu-btn';
+                cpuBtn.textContent = 'vs Computer';
+                cpuBtn.onclick = () => window.location.href = '1v1-coop-game.html';
+                modeButtons.appendChild(cpuBtn);
+            } else {
+                // 2 Player options
+                const coopBtn = document.createElement('button');
+                coopBtn.className = 'menu-btn';
+                coopBtn.textContent = 'Co-op Wave Mode';
+                coopBtn.onclick = () => selectMode('wave');
+                modeButtons.appendChild(coopBtn);
+
+                const vsBtn = document.createElement('button');
+                vsBtn.className = 'menu-btn';
+                vsBtn.textContent = '1v1 Mode';
+                vsBtn.onclick = () => window.location.href = '1v1-coop-game.html';
+                modeButtons.appendChild(vsBtn);
+            }
+        }
+
+        function selectMode(mode) {
+            gameMode = mode;
+            document.getElementById('modeSelect').style.display = 'none';
+            document.getElementById('characterSelect').style.display = 'block';
+            if (playerCount === 2) {
+                document.getElementById('p2Section').style.display = 'block';
+            }
+            showCharacterSelection();
+        }
+
+        function showCharacterSelection() {
+            const p1Grid = document.getElementById('p1Characters');
+            const p2Grid = document.getElementById('p2Characters');
+
+            p1Grid.innerHTML = '';
+            p2Grid.innerHTML = '';
+
+            Object.keys(CHARACTERS).forEach(charKey => {
+                const char = CHARACTERS[charKey];
+
+                // Player 1 button
+                const p1Btn = createCharacterButton(charKey, char, '1');
+                p1Grid.appendChild(p1Btn);
+
+                // Player 2 button
+                if (playerCount === 2) {
+                    const p2Btn = createCharacterButton(charKey, char, '2');
+                    p2Grid.appendChild(p2Btn);
+                }
+            });
+        }
+
+        function createCharacterButton(charKey, char, player) {
+            const btn = document.createElement('div');
+            btn.className = 'character-btn';
+            btn.innerHTML = `
+                <div class="char-name" style="color: ${char.color}">${char.name}</div>
+                <div class="char-stats">
+                    HP: ${char.maxHealth}<br>
+                    DMG: ${char.baseDamage}<br>
+                    SPD: ${char.movementSpeed}
+                </div>
+            `;
+            btn.onclick = () => selectCharacter(charKey, player, btn);
+            return btn;
+        }
+
+        function selectCharacter(character, player, btn) {
+            // Remove previous selection
+            const grid = player === '1' ? 'p1Characters' : 'p2Characters';
+            document.querySelectorAll(`#${grid} .character-btn`).forEach(b => {
+                b.classList.remove('selected');
+            });
+
+            // Add new selection
+            btn.classList.add('selected');
+
+            if (player === '1') selectedP1 = character;
+            if (player === '2') selectedP2 = character;
+
+            // Enable start button if selections are complete
+            if (playerCount === 1 && selectedP1) {
+                document.getElementById('startBtn').disabled = false;
+            } else if (playerCount === 2 && selectedP1 && selectedP2) {
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        function backToPlayerCount() {
+            document.getElementById('modeSelect').style.display = 'none';
+            document.getElementById('playerCountSelect').style.display = 'block';
+        }
+
+        function backToModeSelect() {
+            selectedP1 = null;
+            selectedP2 = null;
+            document.getElementById('characterSelect').style.display = 'none';
+            document.getElementById('modeSelect').style.display = 'block';
+        }
+
+        function backToMenu() {
+            gameRunning = false;
+            currentWave = 1;
+            enemies = [];
+            healthPickups = [];
+            selectedP1 = null;
+            selectedP2 = null;
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('gameCanvas').style.display = 'none';
+            document.getElementById('gameUI').style.display = 'none';
+            document.getElementById('playerCountSelect').style.display = 'block';
+        }
+
+        function restartGame() {
+            document.getElementById('gameOver').style.display = 'none';
+            startGame();
+        }
+
+        // Start Game
+        function startGame() {
+            // Hide menus
+            document.getElementById('characterSelect').style.display = 'none';
+            document.getElementById('gameCanvas').style.display = 'block';
+            document.getElementById('gameUI').style.display = 'block';
+
+            if (playerCount === 2) {
+                document.getElementById('p2HealthContainer').style.display = 'block';
+            }
+
+            // Initialize game state
+            gameRunning = true;
+            currentWave = 1;
+            enemies = [];
+            healthPickups = [];
+            waveEnemiesSpawned = 0;
+            spawnTimer = 0;
+
+            // Create players
+            const p1Controls = {
+                left: 'a',
+                right: 'd',
+                up: 'w',
+                attack: 'f',
+                block: 'g'
+            };
+
+            const p2Controls = {
+                left: 'ArrowLeft',
+                right: 'ArrowRight',
+                up: 'ArrowUp',
+                attack: 'k',
+                block: 'l'
+            };
+
+            player1 = new Player(200, 400, selectedP1, p1Controls, 1);
+
+            if (playerCount === 2) {
+                player2 = new Player(900, 400, selectedP2, p2Controls, 2);
+            } else {
+                player2 = null;
+            }
+
+            startWave();
+            gameLoop();
+        }
+
+        // Player Class
+        class Player {
+            constructor(x, y, characterType, controls, playerNum) {
+                const char = CHARACTERS[characterType];
+                this.characterType = characterType;
+                this.playerNum = playerNum;
+                this.x = x;
+                this.y = y;
+                this.width = char.width;
+                this.height = char.height;
+                this.color = char.color;
+
+                // Stats
+                this.maxHealth = char.maxHealth;
+                this.health = char.maxHealth;
+                this.damageTakenMultiplier = char.damageTaken;
+                this.speed = char.movementSpeed;
+                this.attackSpeed = char.attackSpeed;
+                this.baseDamage = char.baseDamage;
+
+                // Physics
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.onGround = false;
+                this.gravity = 0.5;
+                this.jumpPower = -12;
+                this.hasDoubleJump = true;
+
+                // Combat
+                this.controls = controls;
+                this.facingRight = true;
+                this.attackCooldown = 0;
+                this.isAttacking = false;
+                this.attackFrame = 0;
+                this.attackRange = 60;
+                this.attackButtonPressed = false;
+            }
+
+            update() {
+                // Movement
+                if (keys[this.controls.left]) {
+                    this.velocityX = -this.speed;
+                    this.facingRight = false;
+                } else if (keys[this.controls.right]) {
+                    this.velocityX = this.speed;
+                    this.facingRight = true;
+                } else {
+                    this.velocityX = 0;
+                }
+
+                // Jumping with double jump
+                if (keys[this.controls.up]) {
+                    if (this.onGround) {
+                        this.velocityY = this.jumpPower;
+                        this.onGround = false;
+                        this.hasDoubleJump = true;
+                    } else if (this.hasDoubleJump && !keys['jumpHeld' + this.playerNum]) {
+                        this.velocityY = this.jumpPower;
+                        this.hasDoubleJump = false;
+                        keys['jumpHeld' + this.playerNum] = true;
+                    }
+                } else {
+                    delete keys['jumpHeld' + this.playerNum];
+                }
+
+                // Gravity
+                this.velocityY += this.gravity;
+
+                // Apply velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Ground collision
+                if (this.y + this.height >= 650) {
+                    this.y = 650 - this.height;
+                    this.velocityY = 0;
+                    this.onGround = true;
+                    this.hasDoubleJump = true;
+                }
+
+                // Platform collision
+                checkPlatformCollision(this);
+
+                // Keep in bounds
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Attack
+                if (keys[this.controls.attack] && !this.attackButtonPressed) {
+                    if (this.attackCooldown === 0) {
+                        this.isAttacking = true;
+                        this.attackFrame = 20;
+                        this.attackCooldown = this.attackSpeed;
+                        this.performAttack();
+                    }
+                    this.attackButtonPressed = true;
+                } else if (!keys[this.controls.attack]) {
+                    this.attackButtonPressed = false;
+                }
+
+                // Update attack state
+                if (this.attackFrame > 0) {
+                    this.attackFrame--;
+                    if (this.attackFrame === 0) {
+                        this.isAttacking = false;
+                    }
+                }
+
+                if (this.attackCooldown > 0) {
+                    this.attackCooldown--;
+                }
+
+                // Check health pickup collision
+                healthPickups.forEach((pickup, index) => {
+                    if (checkCollision(this, pickup)) {
+                        this.health = Math.min(this.health + 20, this.maxHealth);
+                        healthPickups.splice(index, 1);
+                        updateHealthUI();
+                    }
+                });
+            }
+
+            performAttack() {
+                const attackBox = {
+                    x: this.facingRight ? this.x + this.width : this.x - this.attackRange,
+                    y: this.y,
+                    width: this.attackRange,
+                    height: this.height
+                };
+
+                enemies.forEach(enemy => {
+                    if (checkCollision(attackBox, enemy) && !enemy.justHit) {
+                        let damage = this.baseDamage;
+
+                        // Berserker rage damage
+                        if (this.characterType === 'berserker') {
+                            const healthLost = this.maxHealth - this.health;
+                            damage += healthLost * 0.2;
+                        }
+
+                        // Assassin crit
+                        if (this.characterType === 'assassin' && Math.random() < 0.25) {
+                            damage *= 2.5;
+                        }
+
+                        enemy.health -= damage;
+                        enemy.justHit = true;
+                        setTimeout(() => enemy.justHit = false, 200);
+
+                        // Knockback
+                        enemy.velocityX = this.facingRight ? 8 : -8;
+                        enemy.velocityY = -5;
+                    }
+                });
+            }
+
+            draw() {
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(this.x, 650, this.width, 5);
+
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Attack indicator
+                if (this.isAttacking) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                    const attackX = this.facingRight ? this.x + this.width : this.x - this.attackRange;
+                    ctx.fillRect(attackX, this.y, this.attackRange, this.height);
+                }
+
+                // Health bar
+                ctx.fillStyle = 'black';
+                ctx.fillRect(this.x, this.y - 15, this.width, 8);
+                ctx.fillStyle = '#ff4444';
+                ctx.fillRect(this.x, this.y - 15, this.width * (this.health / this.maxHealth), 8);
+            }
+        }
+
+        // Enemy Class
+        class Enemy {
+            constructor(x, y, type) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.onGround = false;
+                this.gravity = 0.5;
+                this.dead = false;
+                this.justHit = false;
+                this.aiTimer = 0;
+
+                // Type-specific properties
+                if (type === 'rusher') {
+                    this.width = 40;
+                    this.height = 50;
+                    this.color = '#ff8800';
+                    this.health = 20;
+                    this.maxHealth = 20;
+                    this.speed = 3;
+                    this.damage = 5;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 60;
+                } else if (type === 'tank') {
+                    this.width = 60;
+                    this.height = 80;
+                    this.color = '#666666';
+                    this.health = 60;
+                    this.maxHealth = 60;
+                    this.speed = 1;
+                    this.damage = 15;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 90;
+                } else if (type === 'ranged') {
+                    this.width = 35;
+                    this.height = 45;
+                    this.color = '#00ff88';
+                    this.health = 15;
+                    this.maxHealth = 15;
+                    this.speed = 2;
+                    this.damage = 8;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 120;
+                    this.preferredDistance = 250;
+                } else if (type === 'swarmer') {
+                    this.width = 25;
+                    this.height = 30;
+                    this.color = '#ff00ff';
+                    this.health = 8;
+                    this.maxHealth = 8;
+                    this.speed = 4;
+                    this.damage = 3;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 40;
+                } else if (type === 'healer') {
+                    this.width = 45;
+                    this.height = 55;
+                    this.color = '#ffff00';
+                    this.health = 25;
+                    this.maxHealth = 25;
+                    this.speed = 1.5;
+                    this.damage = 2;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 200;
+                    this.healCooldown = 0;
+                    this.healSpeed = 180;
+                } else if (type === 'splitter') {
+                    this.width = 50;
+                    this.height = 60;
+                    this.color = '#00ffff';
+                    this.health = 30;
+                    this.maxHealth = 30;
+                    this.speed = 2;
+                    this.damage = 7;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 70;
+                    this.hasSplit = false;
+                }
+            }
+
+            update() {
+                if (this.dead) return;
+
+                // AI behavior
+                this.aiTimer++;
+                if (this.aiTimer % 10 === 0) {
+                    this.updateAI();
+                }
+
+                // Gravity
+                this.velocityY += this.gravity;
+
+                // Apply velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Ground collision
+                if (this.y + this.height >= 650) {
+                    this.y = 650 - this.height;
+                    this.velocityY = 0;
+                    this.onGround = true;
+                }
+
+                // Platform collision
+                checkPlatformCollision(this);
+
+                // Keep in bounds
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Attack cooldowns
+                if (this.attackCooldown > 0) this.attackCooldown--;
+                if (this.healCooldown > 0) this.healCooldown--;
+
+                // Check if dead
+                if (this.health <= 0 && !this.dead) {
+                    this.dead = true;
+                    this.onDeath();
+                }
+            }
+
+            updateAI() {
+                const targets = [player1];
+                if (player2) targets.push(player2);
+
+                // Find closest player
+                let closestTarget = targets[0];
+                let minDist = Math.hypot(this.x - closestTarget.x, this.y - closestTarget.y);
+
+                targets.forEach(target => {
+                    const dist = Math.hypot(this.x - target.x, this.y - target.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestTarget = target;
+                    }
+                });
+
+                const dx = closestTarget.x - this.x;
+                const dy = closestTarget.y - this.y;
+                const distance = Math.hypot(dx, dy);
+
+                // Type-specific AI
+                if (this.type === 'ranged') {
+                    // Keep distance but not too far
+                    if (distance > this.preferredDistance + 50) {
+                        this.velocityX = dx > 0 ? this.speed : -this.speed;
+                    } else if (distance < this.preferredDistance - 50) {
+                        this.velocityX = dx > 0 ? -this.speed : this.speed;
+                    } else {
+                        this.velocityX = 0;
+                    }
+
+                    // Attack from range
+                    if (this.attackCooldown === 0 && distance < 400) {
+                        this.attack(closestTarget);
+                    }
+                } else if (this.type === 'healer') {
+                    // Stay away from players
+                    if (distance < 200) {
+                        this.velocityX = dx > 0 ? -this.speed : this.speed;
+                    } else {
+                        this.velocityX = 0;
+                    }
+
+                    // Heal nearby enemies
+                    if (this.healCooldown === 0) {
+                        enemies.forEach(enemy => {
+                            if (enemy !== this && !enemy.dead) {
+                                const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+                                if (dist < 150 && enemy.health < enemy.maxHealth) {
+                                    enemy.health = Math.min(enemy.health + 10, enemy.maxHealth);
+                                    this.healCooldown = this.healSpeed;
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    // Rushers, tanks, swarmers, splitters - chase player
+                    if (distance > 50) {
+                        this.velocityX = dx > 0 ? this.speed : -this.speed;
+                    } else {
+                        this.velocityX = 0;
+                    }
+
+                    // Attack when close
+                    if (this.attackCooldown === 0 && distance < 60) {
+                        this.attack(closestTarget);
+                    }
+                }
+
+                // Jump to reach platforms
+                if (this.onGround && Math.abs(dy) > 50 && Math.abs(dx) < 100) {
+                    this.velocityY = -10;
+                    this.onGround = false;
+                }
+            }
+
+            attack(target) {
+                const distance = Math.hypot(this.x - target.x, this.y - target.y);
+
+                if (this.type === 'ranged' && distance < 400) {
+                    // Ranged attack (instant hit for simplicity)
+                    target.health -= this.damage * target.damageTakenMultiplier;
+                    this.attackCooldown = this.attackSpeed;
+                    updateHealthUI();
+                } else if (distance < 60) {
+                    // Melee attack
+                    target.health -= this.damage * target.damageTakenMultiplier;
+                    this.attackCooldown = this.attackSpeed;
+                    updateHealthUI();
+                }
+            }
+
+            onDeath() {
+                // 3% chance to drop HP
+                if (Math.random() < 0.03) {
+                    healthPickups.push({
+                        x: this.x + this.width / 2 - 15,
+                        y: this.y,
+                        width: 30,
+                        height: 30,
+                        velocityY: 0
+                    });
+                }
+
+                // Splitter splits into swarmers
+                if (this.type === 'splitter' && !this.hasSplit) {
+                    this.hasSplit = true;
+                    for (let i = 0; i < 3; i++) {
+                        const newEnemy = new Enemy(
+                            this.x + (i - 1) * 40,
+                            this.y,
+                            'swarmer'
+                        );
+                        newEnemy.velocityX = (i - 1) * 3;
+                        newEnemy.velocityY = -5;
+                        enemies.push(newEnemy);
+                    }
+                }
+            }
+
+            draw() {
+                if (this.dead) return;
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(this.x, 650, this.width, 5);
+
+                // Body
+                if (this.justHit) {
+                    ctx.fillStyle = '#ffffff';
+                } else {
+                    ctx.fillStyle = this.color;
+                }
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Type indicator
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.type[0].toUpperCase(), this.x + this.width / 2, this.y + this.height / 2);
+
+                // Health bar
+                ctx.fillStyle = 'black';
+                ctx.fillRect(this.x, this.y - 12, this.width, 6);
+                ctx.fillStyle = '#44ff44';
+                ctx.fillRect(this.x, this.y - 12, this.width * (this.health / this.maxHealth), 6);
+            }
+        }
+
+        // Platforms for medieval ruins arena
+        const platforms = [
+            // Ground pillars (low platforms)
+            { x: 150, y: 550, width: 100, height: 20, color: '#8B7355' },
+            { x: 350, y: 520, width: 120, height: 20, color: '#8B7355' },
+            { x: 730, y: 520, width: 120, height: 20, color: '#8B7355' },
+            { x: 950, y: 550, width: 100, height: 20, color: '#8B7355' },
+
+            // Mid-level platforms
+            { x: 100, y: 420, width: 140, height: 20, color: '#A0826D' },
+            { x: 480, y: 400, width: 240, height: 20, color: '#A0826D' },
+            { x: 960, y: 420, width: 140, height: 20, color: '#A0826D' },
+
+            // High platforms (broken archways)
+            { x: 50, y: 280, width: 100, height: 20, color: '#6B5544' },
+            { x: 300, y: 250, width: 150, height: 20, color: '#6B5544' },
+            { x: 750, y: 250, width: 150, height: 20, color: '#6B5544' },
+            { x: 1050, y: 280, width: 100, height: 20, color: '#6B5544' },
+
+            // Very high platforms
+            { x: 550, y: 150, width: 100, height: 20, color: '#5C4A3C' },
+        ];
+
+        // Collision Detection
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function checkPlatformCollision(entity) {
+            platforms.forEach(platform => {
+                // Only check if falling or moving down
+                if (entity.velocityY >= 0) {
+                    // Check if entity is above platform and will collide
+                    if (entity.x + entity.width > platform.x &&
+                        entity.x < platform.x + platform.width &&
+                        entity.y + entity.height <= platform.y &&
+                        entity.y + entity.height + entity.velocityY >= platform.y) {
+
+                        entity.y = platform.y - entity.height;
+                        entity.velocityY = 0;
+                        entity.onGround = true;
+                        if (entity.hasDoubleJump !== undefined) {
+                            entity.hasDoubleJump = true;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Wave System
+        function startWave() {
+            document.getElementById('waveNumber').textContent = currentWave;
+
+            // Calculate enemies for this wave
+            waveEnemiesTotal = 5 + (currentWave * 3);
+            waveEnemiesSpawned = 0;
+
+            // Calculate spawn interval (gets faster each wave)
+            spawnInterval = Math.max(60, 300 - (currentWave * 10));
+            spawnTimer = 0;
+        }
+
+        function spawnEnemy() {
+            if (waveEnemiesSpawned >= waveEnemiesTotal) return;
+
+            // Determine enemy type based on wave
+            let type = 'rusher';
+
+            if (currentWave >= 9) {
+                // Waves 9+: All types
+                const types = ['rusher', 'tank', 'ranged', 'swarmer', 'healer', 'splitter'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 7) {
+                // Waves 7-8: Add healers and splitters
+                const types = ['rusher', 'tank', 'ranged', 'swarmer', 'healer', 'splitter'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 5) {
+                // Waves 5-6: Add swarmers
+                const types = ['rusher', 'tank', 'ranged', 'swarmer', 'swarmer'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 3) {
+                // Waves 3-4: Add ranged
+                const types = ['rusher', 'tank', 'ranged'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 2) {
+                // Wave 2: Add tanks
+                const types = ['rusher', 'rusher', 'tank'];
+                type = types[Math.floor(Math.random() * types.length)];
+            }
+
+            // Random spawn position across arena
+            const x = Math.random() * (canvas.width - 100) + 50;
+            const y = Math.random() * 400 + 100;
+
+            const enemy = new Enemy(x, y, type);
+            enemies.push(enemy);
+            waveEnemiesSpawned++;
+        }
+
+        function checkWaveComplete() {
+            const allEnemiesDead = enemies.every(e => e.dead);
+            const allEnemiesSpawned = waveEnemiesSpawned >= waveEnemiesTotal;
+
+            if (allEnemiesDead && allEnemiesSpawned) {
+                // Clean up dead enemies
+                enemies = enemies.filter(e => !e.dead);
+
+                // Start next wave
+                currentWave++;
+                startWave();
+            }
+        }
+
+        // Update Health UI
+        function updateHealthUI() {
+            // Player 1
+            const p1Percent = (player1.health / player1.maxHealth) * 100;
+            document.getElementById('p1HealthFill').style.width = p1Percent + '%';
+            document.getElementById('p1HealthText').textContent =
+                Math.max(0, Math.floor(player1.health)) + ' / ' + player1.maxHealth;
+
+            // Player 2
+            if (player2) {
+                const p2Percent = (player2.health / player2.maxHealth) * 100;
+                document.getElementById('p2HealthFill').style.width = p2Percent + '%';
+                document.getElementById('p2HealthText').textContent =
+                    Math.max(0, Math.floor(player2.health)) + ' / ' + player2.maxHealth;
+            }
+
+            // Check game over
+            if (player1.health <= 0 || (player2 && player2.health <= 0)) {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalWave').textContent = currentWave;
+            document.getElementById('gameCanvas').style.display = 'none';
+            document.getElementById('gameUI').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // Game Loop
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Clear canvas
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw sky gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#4a5568');
+            gradient.addColorStop(1, '#654321');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = '#3a2f1a';
+            ctx.fillRect(0, 650, canvas.width, 50);
+
+            // Draw platforms
+            platforms.forEach(platform => {
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+                // Stone texture
+                ctx.strokeStyle = '#5a4a3a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+            });
+
+            // Update and draw players
+            player1.update();
+            player1.draw();
+
+            if (player2) {
+                player2.update();
+                player2.draw();
+            }
+
+            // Spawn enemies
+            spawnTimer++;
+            if (spawnTimer >= spawnInterval) {
+                spawnEnemy();
+                spawnTimer = 0;
+            }
+
+            // Update and draw enemies
+            enemies.forEach(enemy => {
+                enemy.update();
+                enemy.draw();
+            });
+
+            // Update and draw health pickups
+            healthPickups.forEach((pickup, index) => {
+                // Gravity for pickups
+                pickup.velocityY += 0.5;
+                pickup.y += pickup.velocityY;
+
+                // Ground collision
+                if (pickup.y + pickup.height >= 650) {
+                    pickup.y = 650 - pickup.height;
+                    pickup.velocityY = 0;
+                }
+
+                // Platform collision
+                platforms.forEach(platform => {
+                    if (pickup.velocityY >= 0 &&
+                        pickup.x + pickup.width > platform.x &&
+                        pickup.x < platform.x + platform.width &&
+                        pickup.y + pickup.height <= platform.y &&
+                        pickup.y + pickup.height + pickup.velocityY >= platform.y) {
+                        pickup.y = platform.y - pickup.height;
+                        pickup.velocityY = 0;
+                    }
+                });
+
+                // Draw pickup
+                ctx.fillStyle = '#ff4444';
+                ctx.fillRect(pickup.x, pickup.y, pickup.width, pickup.height);
+
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('HP', pickup.x + pickup.width / 2, pickup.y + pickup.height / 2 + 7);
+            });
+
+            // Check wave completion
+            checkWaveComplete();
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>

@@ -58,7 +58,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout code
@@ -66,8 +69,8 @@ jobs:
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
-      if: github.event_name == 'push'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./
         exclude_assets: '.github,.git,.claude'
+        force_orphan: true

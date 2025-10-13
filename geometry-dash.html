@@ -15,6 +15,9 @@
                 <span class="level">Level: <span id="currentLevel">1</span></span>
                 <span class="score">Score: <span id="score">0</span></span>
                 <span class="attempts">Attempts: <span id="attempts">1</span></span>
+                <a href="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml" target="_blank" rel="noopener" title="View CI/CD Status" style="margin-left: 15px;">
+                    <img src="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml/badge.svg" alt="Build Status" style="vertical-align: middle; height: 20px;">
+                </a>
             </div>
         </div>
 
@@ -30,21 +33,21 @@
                         <h2 id="warningTitle">⚠️ WARNING ⚠️</h2>
                         <p id="warningMessage"></p>
                         <div class="warning-buttons">
-                            <button id="continueBtn" class="warning-btn continue-btn">Continue</button>
-                            <button id="cancelBtn" class="warning-btn cancel-btn">Cancel</button>
+                            <button type="button" id="continueBtn" class="warning-btn continue-btn">Continue</button>
+                            <button type="button" id="cancelBtn" class="warning-btn cancel-btn">Cancel</button>
                         </div>
                     </div>
                 </div>
                 <div class="game-over" id="gameOver" style="display: none;">
                     <h2>Game Over!</h2>
                     <p>Final Score: <span id="finalScore">0</span></p>
-                    <button id="restartBtn">Play Again</button>
+                    <button type="button" id="restartBtn">Play Again</button>
                 </div>
                 <div class="help-menu" id="helpMenu" style="display: none;">
                     <div class="help-content">
                         <div class="help-header">
                             <h2>🎮 Geometry Dash Help</h2>
-                            <button id="closeHelpBtn" class="close-btn">×</button>
+                            <button type="button" id="closeHelpBtn" class="close-btn">×</button>
                         </div>
                         <div class="help-sections">
                             <div class="help-section">
@@ -159,8 +162,8 @@
                                             </select>
                                         </div>
                                         <div class="leaderboard-actions">
-                                            <button id="changeNameBtn" class="leaderboard-btn">Change Name</button>
-                                            <button id="clearLeaderboardBtn" class="leaderboard-btn danger">Clear Data</button>
+                                            <button type="button" id="changeNameBtn" class="leaderboard-btn">Change Name</button>
+                                            <button type="button" id="clearLeaderboardBtn" class="leaderboard-btn danger">Clear Data</button>
                                         </div>
                                     </div>
                                     <div class="leaderboard-content" id="leaderboardContent">
@@ -199,8 +202,8 @@
                                         </div>
                                     </div>
                                     <div class="analytics-actions">
-                                        <button id="resetAnalyticsBtn" class="analytics-btn">Reset Analytics</button>
-                                        <button id="exportAnalyticsBtn" class="analytics-btn">Export Data</button>
+                                        <button type="button" id="resetAnalyticsBtn" class="analytics-btn">Reset Analytics</button>
+                                        <button type="button" id="exportAnalyticsBtn" class="analytics-btn">Export Data</button>
                                     </div>
                                 </div>
                             </div>
@@ -225,16 +228,16 @@
                     <div class="tutorial-card" id="tutorialCard">
                         <div class="tutorial-header">
                             <h3 id="tutorialTitle">Welcome to Geometry Dash!</h3>
-                            <button id="closeTutorialBtn" class="tutorial-close">×</button>
+                            <button type="button" id="closeTutorialBtn" class="tutorial-close">×</button>
                         </div>
                         <div class="tutorial-body">
                             <p id="tutorialText">Let's learn the basics of the game together.</p>
                             <div class="tutorial-visual" id="tutorialVisual"></div>
                         </div>
                         <div class="tutorial-actions">
-                            <button id="tutorialPrevBtn" class="tutorial-btn secondary">Previous</button>
-                            <button id="tutorialNextBtn" class="tutorial-btn primary">Next</button>
-                            <button id="tutorialSkipBtn" class="tutorial-btn skip">Skip Tutorial</button>
+                            <button type="button" id="tutorialPrevBtn" class="tutorial-btn secondary">Previous</button>
+                            <button type="button" id="tutorialNextBtn" class="tutorial-btn primary">Next</button>
+                            <button type="button" id="tutorialSkipBtn" class="tutorial-btn skip">Skip Tutorial</button>
                         </div>
                     </div>
                 </div>

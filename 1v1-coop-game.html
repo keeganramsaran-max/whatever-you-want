@@ -21,7 +21,7 @@
             overflow: hidden;
         }
 
-        #modeSelect {
+        #playerCountSelect {
             background: rgba(255, 255, 255, 0.95);
             padding: 40px;
             border-radius: 20px;
@@ -30,6 +30,7 @@
             max-width: 600px;
         }
 
+        #modeSelect,
         #difficultySelect {
             display: none;
             background: rgba(255, 255, 255, 0.95);
@@ -366,10 +367,9 @@
 <body>
     <div id="modeSelect">
         <h1>Arena Fighter</h1>
-        <h2>Select Game Mode</h2>
-        <div>
-            <button class="mode-btn" onclick="selectMode('pvp')">Player vs Player</button>
-            <button class="mode-btn" onclick="selectMode('cpu')">Vs Computer</button>
+        <h2 id="modeSelectTitle">Select Game Mode</h2>
+        <div id="modeButtons">
+            <!-- Buttons will be dynamically added based on player count -->
         </div>
     </div>
 
@@ -389,6 +389,15 @@
                 Impossible
                 <div class="difficulty-info">Perfect reactions, no mistakes</div>
             </button>
+        </div>
+    </div>
+
+    <div id="playerCountSelect">
+        <h1>Arena Fighter</h1>
+        <h2>Select Number of Players</h2>
+        <div>
+            <button class="mode-btn" onclick="selectPlayerCount(1)">1 Player</button>
+            <button class="mode-btn" onclick="selectPlayerCount(2)">2 Players</button>
         </div>
     </div>
 
@@ -456,6 +465,7 @@
             </div>
             <div class="round-info">
                 <div id="roundNumber">Round 1</div>
+                <div id="waveNumber" style="display: none;">Wave 1</div>
                 <div class="wins-display">
                     <div class="win-circles" id="p1Wins"></div>
                     <div class="win-circles" id="p2Wins"></div>
@@ -538,8 +548,9 @@
         };
 
         // Game state
-        let gameMode = null; // 'pvp' or 'cpu'
+        let gameMode = null; // 'pvp', 'cpu', or 'wave'
         let difficulty = null; // 'easy', 'medium', or 'impossible'
+        let playerCount = 1; // For wave mode: 1 or 2 players
         let selectedP1 = null;
         let selectedP2 = null;
         let player1 = null;
@@ -550,17 +561,80 @@
         let p2Wins = 0;
         let effects = [];
 
+        // Wave mode variables
+        let currentWave = 1;
+        let enemies = [];
+        let healthPickups = [];
+        let waveEnemiesSpawned = 0;
+        let waveEnemiesTotal = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 180;
+
         // Mode selection
         function selectMode(mode) {
             gameMode = mode;
             document.getElementById('modeSelect').style.display = 'none';
 
             if (mode === 'cpu') {
-                // Show difficulty selection
+                // Show difficulty selection for CPU mode
                 document.getElementById('difficultySelect').style.display = 'block';
-            } else {
-                // PvP mode - go straight to character select
+            } else if (mode === 'wave') {
+                // Wave mode - go to character select
                 document.getElementById('characterSelect').style.display = 'block';
+
+                // Show/hide P2 selection based on player count
+                if (playerCount === 1) {
+                    document.getElementById('p2Selection').style.display = 'none';
+                } else {
+                    document.getElementById('p2Selection').style.display = 'block';
+                }
+            } else {
+                // PvP mode - go to character select with P2 visible
+                document.getElementById('characterSelect').style.display = 'block';
+                document.getElementById('p2Selection').style.display = 'block';
+            }
+        }
+
+        // Player count selection
+        function selectPlayerCount(count) {
+            playerCount = count;
+            document.getElementById('playerCountSelect').style.display = 'none';
+            document.getElementById('modeSelect').style.display = 'block';
+
+            // Clear previous mode buttons
+            const modeButtons = document.getElementById('modeButtons');
+            modeButtons.innerHTML = '';
+
+            if (playerCount === 1) {
+                // 1 Player: Show "Vs Computer" and "Wave Mode"
+                document.getElementById('modeSelectTitle').textContent = '1 Player - Select Game Mode';
+
+                const cpuBtn = document.createElement('button');
+                cpuBtn.className = 'mode-btn';
+                cpuBtn.textContent = 'Vs Computer';
+                cpuBtn.onclick = () => selectMode('cpu');
+                modeButtons.appendChild(cpuBtn);
+
+                const waveBtn = document.createElement('button');
+                waveBtn.className = 'mode-btn';
+                waveBtn.textContent = 'Wave Mode';
+                waveBtn.onclick = () => selectMode('wave');
+                modeButtons.appendChild(waveBtn);
+            } else {
+                // 2 Players: Show "1v1" and "Co-op Wave Mode"
+                document.getElementById('modeSelectTitle').textContent = '2 Players - Select Game Mode';
+
+                const pvpBtn = document.createElement('button');
+                pvpBtn.className = 'mode-btn';
+                pvpBtn.textContent = '1v1';
+                pvpBtn.onclick = () => selectMode('pvp');
+                modeButtons.appendChild(pvpBtn);
+
+                const coopBtn = document.createElement('button');
+                coopBtn.className = 'mode-btn';
+                coopBtn.textContent = 'Co-op Wave Mode';
+                coopBtn.onclick = () => selectMode('wave');
+                modeButtons.appendChild(coopBtn);
             }
         }
 
@@ -606,10 +680,18 @@
                 if (player === '1') selectedP1 = character;
                 if (player === '2') selectedP2 = character;
 
-                // Enable start button if both selected (or if CPU mode and P1 selected)
+                // Enable start button logic
                 if (selectedP1 && selectedP2) {
+                    // Both players selected
                     document.getElementById('startBtn').disabled = false;
                 } else if (gameMode === 'cpu' && selectedP1) {
+                    // CPU mode only needs P1
+                    document.getElementById('startBtn').disabled = false;
+                } else if (gameMode === 'wave' && playerCount === 1 && selectedP1) {
+                    // Wave mode 1 player only needs P1
+                    document.getElementById('startBtn').disabled = false;
+                } else if (gameMode === 'wave' && playerCount === 2 && selectedP1 && selectedP2) {
+                    // Wave mode 2 player needs both
                     document.getElementById('startBtn').disabled = false;
                 }
             });
@@ -1051,6 +1133,11 @@
                 this.isAttacking = true;
                 this.attackFrame = 0;
                 this.attackCooldown = this.attackSpeed;
+
+                // In co-op wave mode, don't damage teammates
+                if (gameMode === 'wave' && playerCount === 2 && opponent) {
+                    return; // Skip damage calculation for teammates
+                }
 
                 // Calculate damage
                 let damage = this.baseDamage;
@@ -2179,30 +2266,338 @@
             }
         }
 
+        // Enemy class for wave mode
+        class Enemy {
+            constructor(x, y, type) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.onGround = false;
+                this.gravity = 0.5;
+                this.dead = false;
+                this.justHit = false;
+                this.aiTimer = 0;
+
+                // Type-specific properties
+                if (type === 'rusher') {
+                    this.width = 40;
+                    this.height = 50;
+                    this.color = '#ff8800';
+                    this.health = 30;
+                    this.maxHealth = 30;
+                    this.speed = 2.5;
+                    this.damage = 8;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 60;
+                } else if (type === 'tank') {
+                    this.width = 60;
+                    this.height = 80;
+                    this.color = '#666666';
+                    this.health = 80;
+                    this.maxHealth = 80;
+                    this.speed = 1;
+                    this.damage = 15;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 90;
+                } else if (type === 'ranged') {
+                    this.width = 35;
+                    this.height = 45;
+                    this.color = '#00ff88';
+                    this.health = 20;
+                    this.maxHealth = 20;
+                    this.speed = 2;
+                    this.damage = 10;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 120;
+                    this.preferredDistance = 250;
+                } else if (type === 'swarmer') {
+                    this.width = 25;
+                    this.height = 30;
+                    this.color = '#ff00ff';
+                    this.health = 12;
+                    this.maxHealth = 12;
+                    this.speed = 3.5;
+                    this.damage = 5;
+                    this.attackCooldown = 0;
+                    this.attackSpeed = 40;
+                }
+            }
+
+            update() {
+                if (this.dead) return;
+
+                // AI behavior
+                this.aiTimer++;
+                if (this.aiTimer % 10 === 0) {
+                    this.updateAI();
+                }
+
+                // Gravity
+                this.velocityY += this.gravity;
+
+                // Apply velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Ground collision
+                if (this.y + this.height >= 550) {
+                    this.y = 550 - this.height;
+                    this.velocityY = 0;
+                    this.onGround = true;
+                }
+
+                // Keep in bounds
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Attack cooldowns
+                if (this.attackCooldown > 0) this.attackCooldown--;
+
+                // Check if dead
+                if (this.health <= 0 && !this.dead) {
+                    this.dead = true;
+                    this.onDeath();
+                }
+            }
+
+            updateAI() {
+                if (!player1) return;
+
+                // Choose closest alive player as target
+                let target = player1;
+                let distance1 = player1.health > 0 ? Math.hypot(player1.x - this.x, player1.y - this.y) : Infinity;
+
+                if (player2 && player2.health > 0) {
+                    const distance2 = Math.hypot(player2.x - this.x, player2.y - this.y);
+                    if (distance2 < distance1) {
+                        target = player2;
+                    }
+                }
+
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const distance = Math.hypot(dx, dy);
+
+                // Type-specific AI
+                if (this.type === 'ranged') {
+                    // Keep distance but not too far
+                    if (distance > this.preferredDistance + 50) {
+                        this.velocityX = dx > 0 ? this.speed : -this.speed;
+                    } else if (distance < this.preferredDistance - 50) {
+                        this.velocityX = dx > 0 ? -this.speed : this.speed;
+                    } else {
+                        this.velocityX = 0;
+                    }
+
+                    // Attack from range
+                    if (this.attackCooldown === 0 && distance < 400) {
+                        this.attack(target);
+                    }
+                } else {
+                    // Rushers, tanks, swarmers - chase player
+                    if (distance > 50) {
+                        this.velocityX = dx > 0 ? this.speed : -this.speed;
+                    } else {
+                        this.velocityX = 0;
+                    }
+
+                    // Attack when close
+                    if (this.attackCooldown === 0 && distance < 60) {
+                        this.attack(target);
+                    }
+                }
+            }
+
+            attack(target) {
+                const distance = Math.hypot(this.x - target.x, this.y - target.y);
+
+                if (this.type === 'ranged' && distance < 400) {
+                    // Ranged attack
+                    target.health -= this.damage;
+                    this.attackCooldown = this.attackSpeed;
+                } else if (distance < 60) {
+                    // Melee attack
+                    target.health -= this.damage;
+                    this.attackCooldown = this.attackSpeed;
+                }
+            }
+
+            onDeath() {
+                // 5% chance to drop HP
+                if (Math.random() < 0.05) {
+                    healthPickups.push({
+                        x: this.x + this.width / 2 - 15,
+                        y: this.y,
+                        width: 30,
+                        height: 30,
+                        velocityY: 0
+                    });
+                }
+            }
+
+            draw(ctx) {
+                if (this.dead) return;
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(this.x, 550, this.width, 5);
+
+                // Body
+                if (this.justHit) {
+                    ctx.fillStyle = '#ffffff';
+                } else {
+                    ctx.fillStyle = this.color;
+                }
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Type indicator
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.type[0].toUpperCase(), this.x + this.width / 2, this.y + this.height / 2);
+
+                // Health bar
+                ctx.fillStyle = 'black';
+                ctx.fillRect(this.x, this.y - 12, this.width, 6);
+                ctx.fillStyle = '#44ff44';
+                ctx.fillRect(this.x, this.y - 12, this.width * (this.health / this.maxHealth), 6);
+            }
+        }
+
+        // Wave mode functions
+        function startWave() {
+            document.getElementById('waveNumber').textContent = 'Wave ' + currentWave;
+
+            // Calculate enemies for this wave
+            waveEnemiesTotal = 5 + (currentWave * 2);
+            waveEnemiesSpawned = 0;
+
+            // Calculate spawn interval (gets faster each wave)
+            spawnInterval = Math.max(60, 180 - (currentWave * 10));
+            spawnTimer = 0;
+        }
+
+        function spawnEnemy() {
+            if (waveEnemiesSpawned >= waveEnemiesTotal) return;
+
+            // Determine enemy type based on wave
+            let type = 'rusher';
+
+            if (currentWave >= 7) {
+                // Waves 7+: All types
+                const types = ['rusher', 'tank', 'ranged', 'swarmer'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 5) {
+                // Waves 5-6: Add swarmers
+                const types = ['rusher', 'tank', 'ranged', 'swarmer', 'swarmer'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 3) {
+                // Waves 3-4: Add ranged
+                const types = ['rusher', 'tank', 'ranged'];
+                type = types[Math.floor(Math.random() * types.length)];
+            } else if (currentWave >= 2) {
+                // Wave 2: Add tanks
+                const types = ['rusher', 'rusher', 'tank'];
+                type = types[Math.floor(Math.random() * types.length)];
+            }
+
+            // Random spawn position
+            const x = Math.random() > 0.5 ? -50 : canvas.width + 50;
+            const y = 300;
+
+            const enemy = new Enemy(x, y, type);
+            enemies.push(enemy);
+            waveEnemiesSpawned++;
+        }
+
+        function checkWaveComplete() {
+            const allEnemiesDead = enemies.every(e => e.dead);
+            const allEnemiesSpawned = waveEnemiesSpawned >= waveEnemiesTotal;
+
+            if (allEnemiesDead && allEnemiesSpawned) {
+                // Clean up dead enemies
+                enemies = enemies.filter(e => !e.dead);
+
+                // Start next wave
+                currentWave++;
+                startWave();
+            }
+        }
+
         function startGame() {
             document.getElementById('characterSelect').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
 
-            // Update UI
-            document.getElementById('p1Name').textContent = CHARACTERS[selectedP1].name;
-            if (gameMode === 'cpu') {
-                document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name + ' (CPU)';
+            if (gameMode === 'wave') {
+                // Wave mode setup
+                document.getElementById('p1Name').textContent = CHARACTERS[selectedP1].name;
+                document.getElementById('roundNumber').style.display = 'none';
+                document.getElementById('waveNumber').style.display = 'block';
+                document.querySelector('.wins-display').style.display = 'none';
+
+                // Initialize wave mode
+                currentWave = 1;
+                enemies = [];
+                healthPickups = [];
+
+                // Create player 1
+                player1 = new Player(playerCount === 1 ? 500 : 200, 300, selectedP1, {
+                    up: 'w',
+                    left: 'a',
+                    right: 'd',
+                    block: 'c',
+                    attack: 'v'
+                }, 1, false, 'medium');
+
+                // Create player 2 if 2-player mode
+                if (playerCount === 2) {
+                    document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
+                    document.getElementById('p2Name').parentElement.style.display = 'block';
+
+                    player2 = new Player(800, 300, selectedP2, {
+                        up: 'arrowup',
+                        left: 'arrowleft',
+                        right: 'arrowright',
+                        block: 'j',
+                        attack: 'k'
+                    }, 2, false, 'medium');
+                } else {
+                    document.getElementById('p2Name').parentElement.style.display = 'none';
+                    player2 = null;
+                }
+
+                effects = [];
+                gameActive = true;
+
+                startWave();
+                gameLoop();
             } else {
-                document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
+                // PvP or CPU mode setup
+                document.getElementById('p1Name').textContent = CHARACTERS[selectedP1].name;
+                if (gameMode === 'cpu') {
+                    document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name + ' (CPU)';
+                } else {
+                    document.getElementById('p2Name').textContent = CHARACTERS[selectedP2].name;
+                }
+
+                document.getElementById('roundNumber').style.display = 'block';
+                document.getElementById('waveNumber').style.display = 'none';
+
+                // Create win circles
+                for (let i = 0; i < 2; i++) {
+                    const p1Circle = document.createElement('div');
+                    p1Circle.className = 'win-circle';
+                    document.getElementById('p1Wins').appendChild(p1Circle);
+
+                    const p2Circle = document.createElement('div');
+                    p2Circle.className = 'win-circle';
+                    document.getElementById('p2Wins').appendChild(p2Circle);
+                }
+
+                startRound();
             }
-
-            // Create win circles
-            for (let i = 0; i < 2; i++) {
-                const p1Circle = document.createElement('div');
-                p1Circle.className = 'win-circle';
-                document.getElementById('p1Wins').appendChild(p1Circle);
-
-                const p2Circle = document.createElement('div');
-                p2Circle.className = 'win-circle';
-                document.getElementById('p2Wins').appendChild(p2Circle);
-            }
-
-            startRound();
         }
 
         function startRound() {
@@ -2277,42 +2672,194 @@
         }
 
         function updateGame() {
-            player1.update(player2);
-            player2.update(player1);
-
-            // Update effects
-            effects = effects.filter(effect => {
-                effect.duration--;
-
-                if (effect.type === 'blizzard' && effect.duration === 29) {
-                    // Apply blizzard damage
-                    const blizzard = effect.data;
-                    const target = blizzard.caster === player1 ? player2 : player1;
-
-                    // Blizzard is unblockable
-                    target.health -= blizzard.damage;
-                    target.stunned = true;
-                    target.stunnedTimer = blizzard.stunDuration;
+            if (gameMode === 'wave') {
+                // Wave mode update
+                player1.update(player2);
+                if (player2) {
+                    player2.update(player1);
                 }
 
-                return effect.duration > 0;
-            });
+                // Update enemies
+                enemies.forEach(enemy => enemy.update());
 
-            // Update UI
-            const p1HealthPercent = (player1.health / player1.maxHealth) * 100;
-            const p2HealthPercent = (player2.health / player2.maxHealth) * 100;
-            document.getElementById('p1Health').style.width = p1HealthPercent + '%';
-            document.getElementById('p2Health').style.width = p2HealthPercent + '%';
+                // Spawn enemies
+                spawnTimer++;
+                if (spawnTimer >= spawnInterval) {
+                    spawnEnemy();
+                    spawnTimer = 0;
+                }
 
-            // Update block counters
-            updateBlockUI('p1Block', player1.blockCounter);
-            updateBlockUI('p2Block', player2.blockCounter);
+                // Check for enemy hits on player attacks
+                if (player1.isAttacking && player1.attackFrame > 15) {
+                    const attackBox = {
+                        x: player1.facingRight ? player1.x + player1.width : player1.x - 60,
+                        y: player1.y,
+                        width: 60,
+                        height: player1.height
+                    };
 
-            // Check for round end
-            if (player1.health <= 0) {
-                endRound(2);
-            } else if (player2.health <= 0) {
-                endRound(1);
+                    enemies.forEach(enemy => {
+                        if (!enemy.dead && !enemy.justHit) {
+                            const collision = attackBox.x < enemy.x + enemy.width &&
+                                            attackBox.x + attackBox.width > enemy.x &&
+                                            attackBox.y < enemy.y + enemy.height &&
+                                            attackBox.y + attackBox.height > enemy.y;
+
+                            if (collision) {
+                                let damage = player1.baseDamage;
+
+                                // Berserker rage
+                                if (player1.characterType === 'berserker') {
+                                    const healthLost = player1.maxHealth - player1.health;
+                                    damage += healthLost * 0.2;
+                                }
+
+                                // Assassin crit
+                                if (player1.characterType === 'assassin' && Math.random() < 0.25) {
+                                    damage *= 2.5;
+                                }
+
+                                enemy.health -= damage;
+                                enemy.justHit = true;
+                                setTimeout(() => enemy.justHit = false, 200);
+
+                                // Knockback
+                                enemy.velocityX = player1.facingRight ? 8 : -8;
+                                enemy.velocityY = -5;
+                            }
+                        }
+                    });
+                }
+
+                // Check for player 2 attacks on enemies (if 2-player mode)
+                if (player2 && player2.isAttacking && player2.attackFrame > 15) {
+                    const attackBox = {
+                        x: player2.facingRight ? player2.x + player2.width : player2.x - 60,
+                        y: player2.y,
+                        width: 60,
+                        height: player2.height
+                    };
+
+                    enemies.forEach(enemy => {
+                        if (!enemy.dead && !enemy.justHit) {
+                            const collision = attackBox.x < enemy.x + enemy.width &&
+                                            attackBox.x + attackBox.width > enemy.x &&
+                                            attackBox.y < enemy.y + enemy.height &&
+                                            attackBox.y + attackBox.height > enemy.y;
+
+                            if (collision) {
+                                let damage = player2.baseDamage;
+
+                                // Berserker rage
+                                if (player2.characterType === 'berserker') {
+                                    const healthLost = player2.maxHealth - player2.health;
+                                    damage += healthLost * 0.2;
+                                }
+
+                                // Assassin crit
+                                if (player2.characterType === 'assassin' && Math.random() < 0.25) {
+                                    damage *= 2.5;
+                                }
+
+                                enemy.health -= damage;
+                                enemy.justHit = true;
+                                setTimeout(() => enemy.justHit = false, 200);
+
+                                // Knockback
+                                enemy.velocityX = player2.facingRight ? 8 : -8;
+                                enemy.velocityY = -5;
+                            }
+                        }
+                    });
+                }
+
+                // Update health pickups
+                healthPickups.forEach((pickup, index) => {
+                    pickup.velocityY += 0.5;
+                    pickup.y += pickup.velocityY;
+
+                    if (pickup.y + pickup.height >= 550) {
+                        pickup.y = 550 - pickup.height;
+                        pickup.velocityY = 0;
+                    }
+
+                    // Check collision with player 1
+                    if (player1.x < pickup.x + pickup.width &&
+                        player1.x + player1.width > pickup.x &&
+                        player1.y < pickup.y + pickup.height &&
+                        player1.y + player1.height > pickup.y) {
+                        player1.health = Math.min(player1.health + 30, player1.maxHealth);
+                        healthPickups.splice(index, 1);
+                        return;
+                    }
+
+                    // Check collision with player 2 (if 2-player mode)
+                    if (player2 && player2.x < pickup.x + pickup.width &&
+                        player2.x + player2.width > pickup.x &&
+                        player2.y < pickup.y + pickup.height &&
+                        player2.y + player2.height > pickup.y) {
+                        player2.health = Math.min(player2.health + 30, player2.maxHealth);
+                        healthPickups.splice(index, 1);
+                    }
+                });
+
+                // Update UI
+                const p1HealthPercent = (player1.health / player1.maxHealth) * 100;
+                document.getElementById('p1Health').style.width = p1HealthPercent + '%';
+
+                if (player2) {
+                    const p2HealthPercent = (player2.health / player2.maxHealth) * 100;
+                    document.getElementById('p2Health').style.width = p2HealthPercent + '%';
+                }
+
+                // Check wave completion
+                checkWaveComplete();
+
+                // Check game over
+                if (player1.health <= 0 && (!player2 || player2.health <= 0)) {
+                    gameActive = false;
+                    document.getElementById('gameOverText').textContent = 'Game Over! Reached Wave ' + currentWave;
+                    document.getElementById('gameOver').style.display = 'block';
+                }
+            } else {
+                // PvP/CPU mode update
+                player1.update(player2);
+                player2.update(player1);
+
+                // Update effects
+                effects = effects.filter(effect => {
+                    effect.duration--;
+
+                    if (effect.type === 'blizzard' && effect.duration === 29) {
+                        // Apply blizzard damage
+                        const blizzard = effect.data;
+                        const target = blizzard.caster === player1 ? player2 : player1;
+
+                        // Blizzard is unblockable
+                        target.health -= blizzard.damage;
+                        target.stunned = true;
+                        target.stunnedTimer = blizzard.stunDuration;
+                    }
+
+                    return effect.duration > 0;
+                });
+
+                // Update UI
+                const p1HealthPercent = (player1.health / player1.maxHealth) * 100;
+                const p2HealthPercent = (player2.health / player2.maxHealth) * 100;
+                document.getElementById('p1Health').style.width = p1HealthPercent + '%';
+                document.getElementById('p2Health').style.width = p2HealthPercent + '%';
+
+                // Update block counters
+                updateBlockUI('p1Block', player1.blockCounter);
+                updateBlockUI('p2Block', player2.blockCounter);
+
+                // Check for round end
+                if (player1.health <= 0) {
+                    endRound(2);
+                } else if (player2.health <= 0) {
+                    endRound(1);
+                }
             }
         }
 
@@ -2370,7 +2917,24 @@
 
             // Draw players
             player1.draw();
-            player2.draw();
+            if (player2) {
+                player2.draw();
+            }
+
+            // Draw enemies (wave mode)
+            if (gameMode === 'wave') {
+                enemies.forEach(enemy => enemy.draw(ctx));
+
+                // Draw health pickups
+                healthPickups.forEach(pickup => {
+                    ctx.fillStyle = '#ff4444';
+                    ctx.fillRect(pickup.x, pickup.y, pickup.width, pickup.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('HP', pickup.x + pickup.width / 2, pickup.y + pickup.height / 2 + 5);
+                });
+            }
         }
 
         function gameLoop() {
