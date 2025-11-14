@@ -41,9 +41,12 @@ class GeometryDash {
             shipSpeed: 3.75 * 1.25 * 1.25 * 1.25,
             ballVelocity: 0,
             ballSpeed: (5.625 / 1.25 / 1.25) * 1.25 * 1.25 * 1.25,
+            spiderVelocity: 0,
+            spiderSpeed: 5,
             rotation: 0,
             gravityDirection: 1,
-            canChangeGravity: true
+            canChangeGravity: true,
+            gravityFlash: 0
         };
 
         // Hitbox offsets for more forgiving collision
@@ -561,9 +564,11 @@ class GeometryDash {
         this.player.waveHorizontalVelocity = 0;
         this.player.shipVelocity = 0;
         this.player.ballVelocity = 0;
+        this.player.spiderVelocity = 0;
         this.player.rotation = 0;
         this.player.gravityDirection = 1;
         this.player.canChangeGravity = true;
+        this.player.gravityFlash = 0;
         this.player.onGround = false;
         this.player.trail = [];
         this.player.persistentWaveTrail = [];
@@ -581,6 +586,18 @@ class GeometryDash {
             if (this.player.canChangeGravity) {
                 this.player.gravityDirection *= -1;
                 this.player.canChangeGravity = false;
+                this.playSound('jump');
+            }
+            return;
+        }
+
+        if (mode === 'spider') {
+            if (this.player.canChangeGravity) {
+                // Instantly flip gravity
+                this.player.gravityDirection *= -1;
+                this.player.canChangeGravity = false;
+                // Trigger flash animation
+                this.player.gravityFlash = 1;
                 this.playSound('jump');
             }
             return;
@@ -724,6 +741,36 @@ class GeometryDash {
             } else {
                 this.player.onGround = false;
             }
+        }
+    }
+
+    handleSpiderMovement() {
+        const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
+        if (mode !== 'spider') return;
+
+        // Spider moves at constant speed on surfaces
+        const ground = this.canvas.height - 50;
+        const ceiling = 0;
+
+        // Apply gravity
+        if (this.player.gravityDirection > 0) {
+            // Normal gravity - stick to ground
+            this.player.y = ground - this.player.height;
+            this.player.onGround = true;
+            this.player.canChangeGravity = true;
+            this.player.velocity = 0;
+        } else {
+            // Inverted gravity - stick to ceiling
+            this.player.y = ceiling;
+            this.player.onGround = true;
+            this.player.canChangeGravity = true;
+            this.player.velocity = 0;
+        }
+
+        // Decay flash effect
+        if (this.player.gravityFlash > 0) {
+            this.player.gravityFlash -= this.deltaTime * 5;
+            if (this.player.gravityFlash < 0) this.player.gravityFlash = 0;
         }
     }
 
@@ -1407,12 +1454,14 @@ class GeometryDash {
         const baseWaveLength = 800 * lengthMultiplier;
         const baseShipLength = 800 * lengthMultiplier;
         const baseBallLength = 600 * lengthMultiplier;
+        const baseSpiderLength = 700 * lengthMultiplier;
 
         return [
             { type: 'standard_jumps', mode: 'cube', x: 400, length: baseCubeLength, maxObjects: Math.floor(objectsPerLevel * 0.4) },
             { type: 'standard_flight', mode: 'wave', x: 400 + baseCubeLength, length: baseWaveLength, maxObjects: Math.floor(objectsPerLevel * 0.3) },
             { type: 'standard_ship', mode: 'ship', x: 400 + baseCubeLength + baseWaveLength, length: baseShipLength, maxObjects: Math.floor(objectsPerLevel * 0.3) },
-            { type: 'standard_ball', mode: 'ball', x: 400 + baseCubeLength + baseWaveLength + baseShipLength, length: baseBallLength, maxObjects: Math.floor(objectsPerLevel * 0.1) }
+            { type: 'standard_ball', mode: 'ball', x: 400 + baseCubeLength + baseWaveLength + baseShipLength, length: baseBallLength, maxObjects: Math.floor(objectsPerLevel * 0.1) },
+            { type: 'standard_spider', mode: 'spider', x: 400 + baseCubeLength + baseWaveLength + baseShipLength + baseBallLength, length: baseSpiderLength, maxObjects: Math.floor(objectsPerLevel * 0.15) }
         ];
     }
 
@@ -1438,7 +1487,8 @@ class GeometryDash {
             standard_jumps: { min: 160, variance: 60 },
             standard_flight: { min: 220, variance: 80 },
             standard_ship: { min: 240, variance: 80 },
-            standard_ball: { min: 140, variance: 60 }
+            standard_ball: { min: 140, variance: 60 },
+            standard_spider: { min: 150, variance: 70 }
         };
 
         return spacings[sectionType] || { min: 150, variance: 50 };
@@ -1453,25 +1503,24 @@ class GeometryDash {
             this.generateShipObstacle(x, sectionType);
         } else if (mode === 'ball') {
             this.generateBallObstacle(x, sectionType);
+        } else if (mode === 'spider') {
+            this.generateSpiderObstacle(x, sectionType);
         }
     }
 
     generateCubeObstacle(x, difficulty) {
+        // Cube mode generates spikes and platforms
         const type = Math.random();
         const difficultyMultiplier = this.getDifficultyMultiplier(difficulty);
 
-        if (type < 0.3 * difficultyMultiplier) {
+        if (type < 0.4) {
+            // Ground spikes
             this.obstacles.push({
                 x: x, y: this.canvas.height - 50 - 40,
                 width: 40, height: 40, type: 'spike'
             });
-        } else if (type < 0.5) {
-            // Add jump pads occasionally
-            this.obstacles.push({
-                x: x, y: this.canvas.height - 50 - 15,
-                width: 50, height: 15, type: 'jump-pad'
-            });
         } else if (type < 0.7) {
+            // Raised platform
             const platformHeight = 60 + Math.random() * (80 * difficultyMultiplier);
             const platformWidth = Math.max(40, 60 - (difficultyMultiplier - 1) * 15);
             this.obstacles.push({
@@ -1479,6 +1528,7 @@ class GeometryDash {
                 width: platformWidth, height: 15, type: 'platform'
             });
         } else {
+            // Floating platform
             const floatingY = 150 + Math.random() * 80;
             const platformWidth = Math.max(35, 50 - (difficultyMultiplier - 1) * 10);
             this.obstacles.push({
@@ -1521,36 +1571,52 @@ class GeometryDash {
     }
 
     generateBallObstacle(x, difficulty) {
-        // Ball mode generates 2 bottom spikes and 2 top spikes with spacing
+        // Ball mode generates multiple spikes together
+        const spikePattern = Math.random();
+        const numSpikes = Math.floor(Math.random() * 3) + 2; // 2-4 spikes
+
+        if (spikePattern < 0.5) {
+            // Generate multiple bottom spikes in a row
+            for (let i = 0; i < numSpikes; i++) {
+                this.obstacles.push({
+                    x: x + (i * 45),
+                    y: this.canvas.height - 50 - 40,
+                    width: 40,
+                    height: 40,
+                    type: 'spike'
+                });
+            }
+        } else {
+            // Generate multiple top spikes in a row (for inverted gravity)
+            for (let i = 0; i < numSpikes; i++) {
+                this.obstacles.push({
+                    x: x + (i * 45),
+                    y: 50,
+                    width: 40,
+                    height: 40,
+                    type: 'spike-up'
+                });
+            }
+        }
+    }
+
+    generateSpiderObstacle(x, difficulty) {
+        // Spider mode generates single spikes on floor or ceiling
         const spikePattern = Math.random();
 
         if (spikePattern < 0.5) {
-            // Generate 2 bottom spikes with spacing
+            // Generate bottom spike
             this.obstacles.push({
                 x: x,
-                y: this.canvas.height - 50 - 40,
-                width: 40,
-                height: 40,
-                type: 'spike'
-            });
-            this.obstacles.push({
-                x: x + 80, // Increased spacing from 50 to 80
                 y: this.canvas.height - 50 - 40,
                 width: 40,
                 height: 40,
                 type: 'spike'
             });
         } else {
-            // Generate 2 top spikes (upside down) with spacing
+            // Generate top spike
             this.obstacles.push({
                 x: x,
-                y: 50,
-                width: 40,
-                height: 40,
-                type: 'spike-up'
-            });
-            this.obstacles.push({
-                x: x + 80, // Increased spacing from 50 to 80
                 y: 50,
                 width: 40,
                 height: 40,
@@ -1801,7 +1867,7 @@ class GeometryDash {
     }
 
     getNextGameMode(currentMode) {
-        const modes = ['cube', 'wave', 'ship', 'ball']; // Original with ball mode
+        const modes = ['cube', 'wave', 'ship', 'ball', 'spider'];
         const currentIndex = modes.indexOf(currentMode);
         return modes[(currentIndex + 1) % modes.length];
     }
@@ -1813,28 +1879,23 @@ class GeometryDash {
             const type = Math.random();
 
             if (mode === 'cube') {
-                console.log('Cube mode: generating obstacles at x:', x);
-                if (type < 0.3) {
-                    console.log('Adding cube spike');
+                console.log('Cube mode: generating spikes and platforms at x:', x);
+                // Generate spikes and platforms for cube mode
+                if (type < 0.4) {
+                    // Ground spike
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
                         width: 40, height: 40, type: 'spike'
                     });
-                } else if (type < 0.5) {
-                    console.log('Adding jump pad');
-                    this.obstacles.push({
-                        x: x, y: this.canvas.height - 50 - 15,
-                        width: 50, height: 15, type: 'jump-pad'
-                    });
                 } else if (type < 0.7) {
-                    console.log('Adding cube platform (raised)');
+                    // Raised platform
                     const platformHeight = 80 + Math.random() * 60;
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - platformHeight,
                         width: 50, height: 15, type: 'platform'
                     });
                 } else {
-                    console.log('Adding cube platform (floating)');
+                    // Floating platform
                     const floatingY = 150 + Math.random() * 80;
                     this.obstacles.push({
                         x: x, y: floatingY,
@@ -1857,26 +1918,41 @@ class GeometryDash {
                     height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
                 });
             } else if (mode === 'ball') {
-                console.log('Ball mode: ONLY generating spikes at top and bottom');
+                console.log('Ball mode: generating multiple spikes at x:', x);
+                // Generate multiple spikes together
+                const spikePattern = Math.random();
+                const numSpikes = Math.floor(Math.random() * 3) + 2; // 2-4 spikes
+
+                if (spikePattern < 0.5) {
+                    // Generate multiple bottom spikes in a row
+                    for (let i = 0; i < numSpikes; i++) {
+                        this.obstacles.push({
+                            x: x + (i * 45), y: this.canvas.height - 50 - 40,
+                            width: 40, height: 40, type: 'spike'
+                        });
+                    }
+                } else {
+                    // Generate multiple top spikes in a row
+                    for (let i = 0; i < numSpikes; i++) {
+                        this.obstacles.push({
+                            x: x + (i * 45), y: 50,
+                            width: 40, height: 40, type: 'spike-up'
+                        });
+                    }
+                }
+            } else if (mode === 'spider') {
+                console.log('Spider mode: generating spikes on ground and ceiling');
                 const spikePattern = Math.random();
                 if (spikePattern < 0.5) {
-                    // Generate 2 bottom spikes with spacing
+                    // Generate bottom spikes
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
                         width: 40, height: 40, type: 'spike'
                     });
-                    this.obstacles.push({
-                        x: x + 80, y: this.canvas.height - 50 - 40,
-                        width: 40, height: 40, type: 'spike'
-                    });
                 } else {
-                    // Generate 2 top spikes (upside down) with spacing
+                    // Generate top spikes (upside down)
                     this.obstacles.push({
                         x: x, y: 50,
-                        width: 40, height: 40, type: 'spike-up'
-                    });
-                    this.obstacles.push({
-                        x: x + 80, y: 50,
                         width: 40, height: 40, type: 'spike-up'
                     });
                 }
@@ -2175,6 +2251,8 @@ class GeometryDash {
             this.checkCubeCollisions();
         } else if (mode === 'ball') {
             this.checkBallCollisions();
+        } else if (mode === 'spider') {
+            this.checkSpiderCollisions();
         } else {
             this.checkWaveCollisions();
         }
@@ -2439,6 +2517,68 @@ class GeometryDash {
         }
     }
 
+    checkSpiderCollisions() {
+        // Spider uses same collision as cube but sticks to surfaces
+        const playerHitbox = this.getPlayerHitbox();
+        const ground = this.canvas.height - 50;
+        const ceiling = 0;
+
+        // Track if spider is touching a surface
+        let onSurface = false;
+
+        for (let obstacle of this.obstacles) {
+            if (obstacle.type === 'platform') {
+                // Spider can walk on platforms
+                if (this.player.x + this.player.width > obstacle.x &&
+                    this.player.x < obstacle.x + obstacle.width) {
+
+                    const playerBottom = this.player.y + this.player.height;
+                    const playerTop = this.player.y;
+                    const platformTop = obstacle.y;
+                    const platformBottom = obstacle.y + obstacle.height;
+
+                    // Check if approaching platform from above (land on top)
+                    if (this.player.gravityDirection > 0 &&
+                        playerBottom >= platformTop &&
+                        playerBottom <= platformTop + 10 &&
+                        playerTop < platformTop) {
+                        this.player.y = platformTop - this.player.height;
+                        this.player.onGround = true;
+                        this.player.canChangeGravity = true;
+                        onSurface = true;
+                        continue;
+                    }
+
+                    // Check if approaching platform from below (stick to bottom)
+                    if (this.player.gravityDirection < 0 &&
+                        playerTop <= platformBottom &&
+                        playerTop >= platformBottom - 10 &&
+                        playerBottom > platformBottom) {
+                        this.player.y = platformBottom;
+                        this.player.onGround = true;
+                        this.player.canChangeGravity = true;
+                        onSurface = true;
+                        continue;
+                    }
+                }
+            } else if (obstacle.type !== 'jump-pad') {
+                // Check for obstacle collision (not jump-pads)
+                if (obstacle.rotation && obstacle.rotation !== 0) {
+                    if (this.checkRotatedRectangleCollision(playerHitbox, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                } else {
+                    const obstacleHitbox = this.getObstacleHitbox(obstacle);
+                    if (this.checkHitboxCollision(playerHitbox, obstacleHitbox)) {
+                        this.gameOver();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     checkWaveCollisions() {
         const mode = this.gameMode === 'mixed' ? this.currentGameMode : this.gameMode;
 
@@ -2592,6 +2732,9 @@ class GeometryDash {
             case 'ball':
                 this.handleBallMovement();
                 break;
+            case 'spider':
+                this.handleSpiderMovement();
+                break;
             default:
                 this.player.velocity += this.player.gravity * this.deltaTime * this.gameSpeedMultiplier;
                 this.player.y += this.player.velocity * this.deltaTime * this.gameSpeedMultiplier;
@@ -2712,17 +2855,108 @@ class GeometryDash {
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
         } else if (mode === 'ship') {
+            // Save context for rotation
+            this.ctx.save();
+
+            const shipCenterY = this.player.y + this.player.height / 2;
+            const shipCenterX = this.player.x + this.player.width / 2;
+            // Extend the ship width to make it longer
+            const shipWidth = this.player.width * 1.4;
+
+            // Calculate rotation based on ship velocity (tilts up when going up, down when going down)
+            const maxTiltAngle = Math.PI / 6; // 30 degrees max tilt
+            const maxVelocity = 300; // Normalize velocity
+            const tiltAngle = Math.max(-maxTiltAngle, Math.min(maxTiltAngle,
+                -(this.player.shipVelocity / maxVelocity) * maxTiltAngle));
+
+            // Translate to ship center, rotate, then translate back
+            this.ctx.translate(shipCenterX, shipCenterY);
+            this.ctx.rotate(tiltAngle);
+            this.ctx.translate(-shipCenterX, -shipCenterY);
+
+            // Main ship body (rounded submarine/rocket shape with gentler curves)
             this.ctx.beginPath();
-            this.ctx.moveTo(this.player.x, this.player.y + this.player.height);
-            this.ctx.lineTo(this.player.x + this.player.width * 0.7, this.player.y);
-            this.ctx.lineTo(this.player.x + this.player.width, this.player.y + this.player.height * 0.5);
-            this.ctx.lineTo(this.player.x + this.player.width * 0.3, this.player.y + this.player.height);
+            // Start from back-left
+            this.ctx.moveTo(this.player.x, shipCenterY);
+            // Top curve (gentler - only goes up to 0.25 instead of 0.15)
+            this.ctx.quadraticCurveTo(
+                this.player.x + shipWidth * 0.4,
+                this.player.y + this.player.height * 0.25,
+                this.player.x + shipWidth * 0.9,
+                this.player.y + this.player.height * 0.35
+            );
+            // Nose point
+            this.ctx.lineTo(this.player.x + shipWidth, shipCenterY);
+            // Bottom curve (gentler - only goes down to 0.75 instead of 0.85)
+            this.ctx.quadraticCurveTo(
+                this.player.x + shipWidth * 0.9,
+                this.player.y + this.player.height * 0.65,
+                this.player.x + shipWidth * 0.4,
+                this.player.y + this.player.height * 0.75
+            );
+            this.ctx.lineTo(this.player.x, shipCenterY);
             this.ctx.closePath();
             this.ctx.fill();
 
+            // Main body outline
             this.ctx.strokeStyle = '#ffffff';
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
+
+            // Top fin
+            this.ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.player.x + shipWidth * 0.25, this.player.y + this.player.height * 0.3);
+            this.ctx.lineTo(this.player.x + shipWidth * 0.32, this.player.y + this.player.height * 0.05);
+            this.ctx.lineTo(this.player.x + shipWidth * 0.45, this.player.y + this.player.height * 0.3);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // Bottom fin
+            this.ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.player.x + shipWidth * 0.25, this.player.y + this.player.height * 0.7);
+            this.ctx.lineTo(this.player.x + shipWidth * 0.32, this.player.y + this.player.height * 0.95);
+            this.ctx.lineTo(this.player.x + shipWidth * 0.45, this.player.y + this.player.height * 0.7);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // Three portholes
+            const portholeY = shipCenterY;
+            const portholeRadius = this.player.width * 0.08;
+
+            for (let i = 0; i < 3; i++) {
+                this.ctx.fillStyle = 'rgba(100, 200, 255, 0.7)';
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    this.player.x + shipWidth * (0.45 + i * 0.12),
+                    portholeY,
+                    portholeRadius,
+                    0,
+                    Math.PI * 2
+                );
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.stroke();
+            }
+
+            // Engine thruster line at back
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.player.x + shipWidth * 0.05, shipCenterY - this.player.height * 0.15);
+            this.ctx.lineTo(this.player.x + shipWidth * 0.05, shipCenterY + this.player.height * 0.15);
+            this.ctx.stroke();
+
+            // Restore context after rotation
+            this.ctx.restore();
         } else if (mode === 'ball') {
             this.ctx.save();
             this.ctx.translate(centerX, centerY);
@@ -2743,6 +2977,93 @@ class GeometryDash {
             this.ctx.lineTo(this.player.width / 2, 0);
             this.ctx.moveTo(0, -this.player.width / 2);
             this.ctx.lineTo(0, this.player.width / 2);
+            this.ctx.stroke();
+
+            this.ctx.restore();
+        } else if (mode === 'spider') {
+            // Spider mode - draw robotic spider icon with flash effect
+            this.ctx.save();
+
+            // Flash effect when switching gravity
+            if (this.player.gravityFlash > 0) {
+                this.ctx.globalAlpha = 0.5 + (this.player.gravityFlash * 0.5);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(this.player.x - 10, this.player.y - 10, this.player.width + 20, this.player.height + 20);
+                this.ctx.globalAlpha = 1;
+            }
+
+            const spiderCenterX = this.player.x + this.player.width / 2;
+            const spiderCenterY = this.player.y + this.player.height / 2;
+
+            // Flip spider upside down when gravity is inverted (walking on ceiling)
+            if (this.player.gravityDirection < 0) {
+                this.ctx.translate(spiderCenterX, spiderCenterY);
+                this.ctx.scale(1, -1);
+                this.ctx.translate(-spiderCenterX, -spiderCenterY);
+            }
+
+            // Main body - trapezoid/rectangular shape
+            this.ctx.fillStyle = this.player.color;
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.player.x + this.player.width * 0.15, this.player.y + this.player.height * 0.2);
+            this.ctx.lineTo(this.player.x + this.player.width * 0.55, this.player.y);
+            this.ctx.lineTo(this.player.x + this.player.width * 0.85, this.player.y + this.player.height * 0.2);
+            this.ctx.lineTo(this.player.x + this.player.width * 0.85, this.player.y + this.player.height * 0.7);
+            this.ctx.lineTo(this.player.x + this.player.width * 0.15, this.player.y + this.player.height * 0.7);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // Eye/circle on top right
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.arc(this.player.x + this.player.width * 0.7, this.player.y + this.player.height * 0.3, this.player.width * 0.12, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 1.5;
+            this.ctx.stroke();
+
+            // Mechanical legs - angular and bent
+            this.ctx.strokeStyle = this.player.color;
+            this.ctx.lineWidth = 3;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+
+            // Front legs (2 legs)
+            const frontLegX = this.player.x + this.player.width * 0.7;
+            const legStartY = this.player.y + this.player.height * 0.7;
+
+            // Front right leg
+            this.ctx.beginPath();
+            this.ctx.moveTo(frontLegX, legStartY);
+            this.ctx.lineTo(frontLegX + this.player.width * 0.2, legStartY + this.player.height * 0.15);
+            this.ctx.lineTo(frontLegX + this.player.width * 0.35, legStartY + this.player.height * 0.35);
+            this.ctx.stroke();
+
+            // Front left leg
+            this.ctx.beginPath();
+            this.ctx.moveTo(frontLegX, legStartY);
+            this.ctx.lineTo(frontLegX - this.player.width * 0.2, legStartY + this.player.height * 0.15);
+            this.ctx.lineTo(frontLegX - this.player.width * 0.35, legStartY + this.player.height * 0.35);
+            this.ctx.stroke();
+
+            // Back legs (2 legs)
+            const backLegX = this.player.x + this.player.width * 0.3;
+
+            // Back right leg
+            this.ctx.beginPath();
+            this.ctx.moveTo(backLegX, legStartY);
+            this.ctx.lineTo(backLegX + this.player.width * 0.15, legStartY + this.player.height * 0.2);
+            this.ctx.lineTo(backLegX + this.player.width * 0.25, legStartY + this.player.height * 0.4);
+            this.ctx.stroke();
+
+            // Back left leg
+            this.ctx.beginPath();
+            this.ctx.moveTo(backLegX, legStartY);
+            this.ctx.lineTo(backLegX - this.player.width * 0.15, legStartY + this.player.height * 0.2);
+            this.ctx.lineTo(backLegX - this.player.width * 0.25, legStartY + this.player.height * 0.4);
             this.ctx.stroke();
 
             this.ctx.restore();
@@ -7186,11 +7507,22 @@ class GeometryDash {
 
     editCustomLevel(slot) {
         console.log(`Editing custom level from slot ${slot}`);
-        // Load level into editor - reuse existing editor functionality
+        // Load level into editor
         const levelData = this.customLevels.slots[slot];
         if (levelData) {
-            localStorage.setItem('customLevel', JSON.stringify(levelData.data));
-            window.location.href = window.location.pathname + '?custom=true';
+            // Store level data and metadata in localStorage for the editor to load
+            const editData = {
+                ...levelData.data,
+                name: levelData.metadata?.name || `Custom Level ${slot}`,
+                difficulty: levelData.metadata?.difficulty || 1
+            };
+            localStorage.setItem('editLevelData', JSON.stringify(editData));
+
+            // Also store the slot number so we can update it when saving
+            localStorage.setItem('editLevelSlot', slot.toString());
+
+            // Redirect to the level editor
+            window.location.href = 'level-editor.html';
         }
     }
 

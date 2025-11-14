@@ -33,6 +33,7 @@ class LevelEditor {
         this.objectRotation = 0;
 
         this.setupEventListeners();
+        this.loadLevelFromLocalStorage();
         this.render();
     }
 
@@ -993,6 +994,41 @@ class LevelEditor {
         this.selectedObject = null;
         this.updateStats();
         this.render();
+    }
+
+    loadLevelFromLocalStorage() {
+        // Check if there's level data in localStorage (from editing a user level)
+        const editLevelData = localStorage.getItem('editLevelData');
+        if (editLevelData) {
+            try {
+                const levelData = JSON.parse(editLevelData);
+
+                // Import the level data
+                this.objects = levelData.objects || [];
+                this.portals = levelData.portals || [];
+                this.speedPortals = levelData.speedPortals || [];
+                this.finishPortals = levelData.finishPortals || [];
+
+                // Set metadata if available
+                if (levelData.name) {
+                    document.getElementById('levelName').value = levelData.name;
+                }
+                if (levelData.difficulty) {
+                    document.getElementById('levelDifficulty').value = levelData.difficulty;
+                }
+
+                this.selectedObject = null;
+                this.updateStats();
+
+                // Clear the localStorage item after loading
+                localStorage.removeItem('editLevelData');
+
+                console.log('Loaded level from localStorage for editing');
+            } catch (e) {
+                console.error('Error loading level from localStorage:', e);
+                localStorage.removeItem('editLevelData');
+            }
+        }
     }
 }
 
