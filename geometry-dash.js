@@ -875,6 +875,39 @@ class GeometryDash {
             height: portal.height,
             rotation: portal.rotation || 0
         })) : [];
+
+        // Assign game modes to obstacles based on portal positions
+        this.assignGameModesToObstacles();
+    }
+
+    assignGameModesToObstacles() {
+        // Sort portals by x position to ensure correct order
+        const sortedPortals = [...this.portals].sort((a, b) => a.x - b.x);
+
+        // Assign game modes to each obstacle based on which portal section it's in
+        for (let obstacle of this.obstacles) {
+            // Skip if obstacle already has a game mode
+            if (obstacle.gameMode) continue;
+
+            // Default to cube mode (before first portal)
+            let assignedMode = 'cube';
+
+            // Find which portal section this obstacle is in
+            for (let portal of sortedPortals) {
+                if (obstacle.x >= portal.x) {
+                    // Obstacle is past this portal, so it belongs to this portal's mode
+                    assignedMode = portal.toMode;
+                } else {
+                    // Obstacle is before this portal, stop checking
+                    break;
+                }
+            }
+
+            // Assign the determined game mode
+            obstacle.gameMode = assignedMode;
+        }
+
+        console.log('Assigned game modes to obstacles based on portal positions');
     }
 
     loadDeveloperChallenge() {
@@ -1517,7 +1550,7 @@ class GeometryDash {
             // Ground spikes
             this.obstacles.push({
                 x: x, y: this.canvas.height - 50 - 40,
-                width: 40, height: 40, type: 'spike'
+                width: 40, height: 40, type: 'spike', gameMode: 'cube'
             });
         } else if (type < 0.7) {
             // Raised platform
@@ -1525,7 +1558,7 @@ class GeometryDash {
             const platformWidth = Math.max(40, 60 - (difficultyMultiplier - 1) * 15);
             this.obstacles.push({
                 x: x, y: this.canvas.height - 50 - platformHeight,
-                width: platformWidth, height: 15, type: 'platform'
+                width: platformWidth, height: 15, type: 'platform', gameMode: 'cube'
             });
         } else {
             // Floating platform
@@ -1533,7 +1566,7 @@ class GeometryDash {
             const platformWidth = Math.max(35, 50 - (difficultyMultiplier - 1) * 10);
             this.obstacles.push({
                 x: x, y: floatingY,
-                width: platformWidth, height: 15, type: 'platform'
+                width: platformWidth, height: 15, type: 'platform', gameMode: 'cube'
             });
         }
     }
@@ -1546,11 +1579,11 @@ class GeometryDash {
 
         this.obstacles.push({
             x: x, y: 0, width: 30,
-            height: gapPosition - gapSize/2, type: 'wall-top'
+            height: gapPosition - gapSize/2, type: 'wall-top', gameMode: 'wave'
         });
         this.obstacles.push({
             x: x, y: gapPosition + gapSize/2, width: 30,
-            height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
+            height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom', gameMode: 'wave'
         });
     }
 
@@ -1562,11 +1595,11 @@ class GeometryDash {
 
         this.obstacles.push({
             x: x, y: 0, width: 25,
-            height: gapPosition - gapSize/2, type: 'wall-top'
+            height: gapPosition - gapSize/2, type: 'wall-top', gameMode: 'ship'
         });
         this.obstacles.push({
             x: x, y: gapPosition + gapSize/2, width: 25,
-            height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
+            height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom', gameMode: 'ship'
         });
     }
 
@@ -1583,7 +1616,8 @@ class GeometryDash {
                     y: this.canvas.height - 50 - 40,
                     width: 40,
                     height: 40,
-                    type: 'spike'
+                    type: 'spike',
+                    gameMode: 'ball'
                 });
             }
         } else {
@@ -1594,7 +1628,8 @@ class GeometryDash {
                     y: 50,
                     width: 40,
                     height: 40,
-                    type: 'spike-up'
+                    type: 'spike-up',
+                    gameMode: 'ball'
                 });
             }
         }
@@ -1611,7 +1646,8 @@ class GeometryDash {
                 y: this.canvas.height - 50 - 40,
                 width: 40,
                 height: 40,
-                type: 'spike'
+                type: 'spike',
+                gameMode: 'spider'
             });
         } else {
             // Generate top spike
@@ -1620,7 +1656,8 @@ class GeometryDash {
                 y: 50,
                 width: 40,
                 height: 40,
-                type: 'spike-up'
+                type: 'spike-up',
+                gameMode: 'spider'
             });
         }
     }
@@ -1820,49 +1857,57 @@ class GeometryDash {
     }
 
     generateMixedLevel() {
-        let currentMode = 'cube';
         let sectionLength = 800;
+        const totalSections = 11; // Increased to 11 to complete the cycle with a final cube section
 
-        for (let section = 0; section < 10; section++) {
+        for (let section = 0; section < totalSections; section++) {
             const startX = 400 + section * sectionLength;
             const endX = startX + sectionLength - 200;
 
+            // Determine what mode THIS section should have based on its position
+            let sectionMode;
+            if (section % 5 === 0) {
+                sectionMode = 'cube';
+            } else if (section % 5 === 1) {
+                sectionMode = 'wave';
+            } else if (section % 5 === 2) {
+                sectionMode = 'ship';
+            } else if (section % 5 === 3) {
+                sectionMode = 'ball';
+            } else {
+                sectionMode = 'spider';
+            }
+
             if (section > 0) {
-                // Determine what mode the NEXT section will need
-                let portalToMode;
-                if (section % 4 === 0) {
-                    portalToMode = 'cube'; // Next section is cube-only
-                } else if (section % 4 === 1) {
-                    portalToMode = 'wave'; // Next section is wave
-                } else if (section % 4 === 2) {
-                    portalToMode = 'ship'; // Next section is ship
+                // Get the previous section's mode
+                let prevMode;
+                if ((section - 1) % 5 === 0) {
+                    prevMode = 'cube';
+                } else if ((section - 1) % 5 === 1) {
+                    prevMode = 'wave';
+                } else if ((section - 1) % 5 === 2) {
+                    prevMode = 'ship';
+                } else if ((section - 1) % 5 === 3) {
+                    prevMode = 'ball';
                 } else {
-                    portalToMode = 'ball'; // Next section is ball
+                    prevMode = 'spider';
                 }
 
-                console.log(`Portal at x${startX - 100}: ${currentMode} → ${portalToMode} (for section ${section})`);
+                console.log(`Portal at x${startX - 100}: ${prevMode} → ${sectionMode} (for section ${section})`);
 
                 this.portals.push({
                     x: startX - 100,
                     y: 0,
                     width: 60,
                     height: this.canvas.height - 50,
-                    fromMode: currentMode,
-                    toMode: portalToMode
+                    fromMode: prevMode,
+                    toMode: sectionMode
                 });
             }
 
-            // Generate obstacles for the intended mode sequence (for level design)
-            console.log(`Section ${section}: x${startX}-${endX}, planned mode: ${currentMode}`);
-
-            // FORCE cube sections to only have cube obstacles (no pillars ever)
-            if (section % 4 === 0) { // Sections 0, 4, 8 should be cube-only
-                console.log(`🎯 FORCING section ${section} to be cube-only (no pillars)`);
-                this.generateSectionObstacles(startX, endX, 'cube');
-            } else {
-                this.generateSectionObstacles(startX, endX, currentMode);
-            }
-            currentMode = this.getNextGameMode(currentMode);
+            // Generate obstacles for this section's mode
+            console.log(`Section ${section}: x${startX}-${endX}, mode: ${sectionMode}`);
+            this.generateSectionObstacles(startX, endX, sectionMode);
         }
     }
 
@@ -1885,21 +1930,21 @@ class GeometryDash {
                     // Ground spike
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
-                        width: 40, height: 40, type: 'spike'
+                        width: 40, height: 40, type: 'spike', gameMode: 'cube'
                     });
                 } else if (type < 0.7) {
                     // Raised platform
                     const platformHeight = 80 + Math.random() * 60;
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - platformHeight,
-                        width: 50, height: 15, type: 'platform'
+                        width: 50, height: 15, type: 'platform', gameMode: 'cube'
                     });
                 } else {
                     // Floating platform
                     const floatingY = 150 + Math.random() * 80;
                     this.obstacles.push({
                         x: x, y: floatingY,
-                        width: 45, height: 15, type: 'platform'
+                        width: 45, height: 15, type: 'platform', gameMode: 'cube'
                     });
                 }
             } else if (mode === 'wave' || mode === 'ship') {
@@ -1910,12 +1955,12 @@ class GeometryDash {
                 console.log('Adding wall-top');
                 this.obstacles.push({
                     x: x, y: 0, width: 30,
-                    height: gapPosition - gapSize/2, type: 'wall-top'
+                    height: gapPosition - gapSize/2, type: 'wall-top', gameMode: mode
                 });
                 console.log('Adding wall-bottom');
                 this.obstacles.push({
                     x: x, y: gapPosition + gapSize/2, width: 30,
-                    height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom'
+                    height: this.canvas.height - 50 - (gapPosition + gapSize/2), type: 'wall-bottom', gameMode: mode
                 });
             } else if (mode === 'ball') {
                 console.log('Ball mode: generating multiple spikes at x:', x);
@@ -1928,7 +1973,7 @@ class GeometryDash {
                     for (let i = 0; i < numSpikes; i++) {
                         this.obstacles.push({
                             x: x + (i * 45), y: this.canvas.height - 50 - 40,
-                            width: 40, height: 40, type: 'spike'
+                            width: 40, height: 40, type: 'spike', gameMode: 'ball'
                         });
                     }
                 } else {
@@ -1936,7 +1981,7 @@ class GeometryDash {
                     for (let i = 0; i < numSpikes; i++) {
                         this.obstacles.push({
                             x: x + (i * 45), y: 50,
-                            width: 40, height: 40, type: 'spike-up'
+                            width: 40, height: 40, type: 'spike-up', gameMode: 'ball'
                         });
                     }
                 }
@@ -1947,13 +1992,13 @@ class GeometryDash {
                     // Generate bottom spikes
                     this.obstacles.push({
                         x: x, y: this.canvas.height - 50 - 40,
-                        width: 40, height: 40, type: 'spike'
+                        width: 40, height: 40, type: 'spike', gameMode: 'spider'
                     });
                 } else {
                     // Generate top spikes (upside down)
                     this.obstacles.push({
                         x: x, y: 50,
-                        width: 40, height: 40, type: 'spike-up'
+                        width: 40, height: 40, type: 'spike-up', gameMode: 'spider'
                     });
                 }
             }
@@ -2277,6 +2322,11 @@ class GeometryDash {
         const playerHitbox = this.getPlayerHitbox();
 
         for (let obstacle of this.obstacles) {
+            // Skip obstacles that don't belong to cube mode
+            if (obstacle.gameMode && obstacle.gameMode !== 'cube') {
+                continue;
+            }
+
             if (obstacle.type === 'platform') {
                 // Use full collision for platform landing detection
                 if (this.player.x < obstacle.x + obstacle.width &&
@@ -2376,6 +2426,11 @@ class GeometryDash {
         const playerHitbox = this.getPlayerHitbox();
 
         for (let obstacle of this.obstacles) {
+            // Skip obstacles that don't belong to ball mode
+            if (obstacle.gameMode && obstacle.gameMode !== 'ball') {
+                continue;
+            }
+
             if (obstacle.type === 'platform') {
                 // Use full collision for platform bouncing
                 if (this.player.x < obstacle.x + obstacle.width &&
@@ -2527,6 +2582,11 @@ class GeometryDash {
         let onSurface = false;
 
         for (let obstacle of this.obstacles) {
+            // Skip obstacles that don't belong to spider mode
+            if (obstacle.gameMode && obstacle.gameMode !== 'spider') {
+                continue;
+            }
+
             if (obstacle.type === 'platform') {
                 // Spider can walk on platforms
                 if (this.player.x + this.player.width > obstacle.x &&
@@ -2609,6 +2669,11 @@ class GeometryDash {
         const playerHitbox = this.getPlayerHitbox();
 
         for (let obstacle of this.obstacles) {
+            // Skip obstacles that don't belong to wave or ship mode
+            if (obstacle.gameMode && obstacle.gameMode !== 'wave' && obstacle.gameMode !== 'ship') {
+                continue;
+            }
+
             if (obstacle.type === 'platform') {
                 // Platforms are solid surfaces for wave/ship modes but don't kill
                 const obstacleHitbox = {
@@ -3087,6 +3152,9 @@ class GeometryDash {
                 obstacle.x > this.camera.x + this.canvas.width + 100) {
                 continue;
             }
+
+            // Note: We render ALL obstacles so you can see what's coming in other mode sections
+            // But collision detection still filters by game mode
 
             // Handle rotation if present
             if (obstacle.rotation && obstacle.rotation !== 0) {
@@ -3580,12 +3648,6 @@ class GeometryDash {
     }
 
     levelComplete() {
-        // Check if this is verification mode
-        if (this.inVerificationMode) {
-            this.handleVerificationCompletion();
-            return;
-        }
-
         // Record completion for leaderboard (if not in auto-play mode)
         if (!this.autoPlay && this.leaderboard.enabled) {
             const completionTime = Date.now() - this.levelStartTime;
@@ -5970,56 +6032,6 @@ class GeometryDash {
                         </div>
                     </div>
 
-                    <div id="levelVerificationSection" style="
-                        background: rgba(255, 193, 7, 0.1);
-                        border: 1px solid #ffc107;
-                        border-radius: 8px;
-                        padding: 20px;
-                        margin: 20px 0;
-                        text-align: center;
-                    ">
-                        <h4 style="color: #ffc107; margin: 0 0 15px 0;">⚠️ Level Verification Required</h4>
-                        <p style="margin: 0 0 15px 0; color: #ccc;">
-                            You must complete your level before uploading to ensure it's beatable!
-                        </p>
-                        <div id="verificationStatus" style="margin: 15px 0;">
-                            <span id="verificationStatusText" style="
-                                color: #ff6b6b;
-                                font-weight: bold;
-                            ">❌ Level not verified</span>
-                        </div>
-                        <div class="owner-code-section" style="margin: 15px 0;">
-                            <input type="password" id="ownerCodeInput" placeholder="Owner Code (optional)" style="
-                                background: rgba(255, 193, 7, 0.1);
-                                border: 1px solid #ffc107;
-                                border-radius: 6px;
-                                padding: 8px 12px;
-                                color: white;
-                                font-size: 0.9rem;
-                                text-align: center;
-                                width: 200px;
-                                margin-bottom: 5px;
-                            ">
-                            <div style="font-size: 0.8rem; color: #aaa;">
-                                Enter owner code to bypass verification
-                            </div>
-                        </div>
-                        <button id="testLevelBtn" style="
-                            background: linear-gradient(45deg, #ffc107, #ff9800);
-                            color: #1a1a2e;
-                            border: none;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-weight: bold;
-                            margin-right: 10px;
-                        " disabled>🎮 Test Level</button>
-                        <div id="testInstructions" style="
-                            margin-top: 10px;
-                            font-size: 0.9rem;
-                            color: #aaa;
-                        ">Upload level data first to enable testing</div>
-                    </div>
 
                     <div class="upload-actions" style="display: flex; gap: 15px; justify-content: center;">
                         <button id="uploadLevelBtn" style="
@@ -6217,54 +6229,6 @@ class GeometryDash {
         cancelBtn.addEventListener('click', closeConfirm);
     }
 
-    checkOwnerCode(modal) {
-        const ownerCodeInput = modal.querySelector('#ownerCodeInput');
-        const ownerCode = ownerCodeInput.value.trim();
-
-        console.log('Checking owner code:', ownerCode, 'Length:', ownerCode.length);
-
-        if (ownerCode === 'T00Thless!') {
-            console.log('✅ Owner code CORRECT!');
-            // Owner code is correct - bypass verification
-            modal.hasLevelVerification = true;
-            modal.ownerCodeVerified = true;
-
-            // Update verification status
-            this.updateVerificationStatus(modal, true);
-
-            // Update verification section to show owner bypass
-            const statusText = modal.querySelector('#verificationStatusText');
-            const verificationSection = modal.querySelector('#levelVerificationSection');
-
-            statusText.innerHTML = '👑 Owner verified - Upload enabled!';
-            statusText.style.color = '#ffd700';
-            verificationSection.style.borderColor = '#ffd700';
-            verificationSection.style.background = 'rgba(255, 215, 0, 0.1)';
-
-            // Update owner code input styling
-            ownerCodeInput.style.borderColor = '#ffd700';
-            ownerCodeInput.style.background = 'rgba(255, 215, 0, 0.1)';
-
-        } else if (ownerCode === '') {
-            console.log('Owner code empty');
-            // Empty code - reset to normal verification state
-            modal.hasLevelVerification = false;
-            modal.ownerCodeVerified = false;
-            this.updateVerificationStatus(modal, false);
-
-            // Reset owner code input styling
-            ownerCodeInput.style.borderColor = '#ffc107';
-            ownerCodeInput.style.background = 'rgba(255, 193, 7, 0.1)';
-
-        } else if (ownerCode.length > 0) {
-            // Wrong code entered
-            ownerCodeInput.style.borderColor = '#ff4444';
-            ownerCodeInput.style.background = 'rgba(255, 68, 68, 0.1)';
-        }
-
-        // Re-validate to update upload button
-        this.validateLevelData(modal);
-    }
 
     setupLevelUploadListeners(modal) {
         const closeBtn = modal.querySelector('#closeLevelUploadBtn');
@@ -6360,18 +6324,6 @@ class GeometryDash {
         const jsonInput = modal.querySelector('#levelJsonInput');
         jsonInput.addEventListener('input', () => {
             this.validateLevelData(modal);
-        });
-
-        // Owner code input handler
-        const ownerCodeInput = modal.querySelector('#ownerCodeInput');
-        ownerCodeInput.addEventListener('input', () => {
-            this.checkOwnerCode(modal);
-        });
-
-        // Test Level button
-        const testLevelBtn = modal.querySelector('#testLevelBtn');
-        testLevelBtn.addEventListener('click', () => {
-            this.startLevelVerification(modal);
         });
 
         // Upload button
@@ -6524,36 +6476,14 @@ class GeometryDash {
             validationErrors
         });
 
-        // Update test level button state
-        const testLevelBtn = modal.querySelector('#testLevelBtn');
-        const testInstructions = modal.querySelector('#testInstructions');
-        const hasValidData = levelData !== null && this.isValidLevelData(levelData);
-
-        testLevelBtn.disabled = !hasValidData;
-        testLevelBtn.style.opacity = hasValidData ? '1' : '0.5';
-
-        if (hasValidData) {
-            testInstructions.textContent = 'Test your level to verify it\'s beatable!';
-            testInstructions.style.color = '#00ff88';
-        } else {
-            testInstructions.textContent = 'Upload level data first to enable testing';
-            testInstructions.style.color = '#aaa';
-        }
-
-        // Check if level is verified (only enable upload if verified)
-        const isVerified = modal.hasLevelVerification || false;
-        const canUpload = isValid && isVerified;
-
         // Update upload button state
-        uploadBtn.disabled = !canUpload;
-        uploadBtn.style.opacity = canUpload ? '1' : '0.5';
+        uploadBtn.disabled = !isValid;
+        uploadBtn.style.opacity = isValid ? '1' : '0.5';
 
         if (!isValid) {
             uploadBtn.title = 'Validation errors: ' + validationErrors.join(', ');
-        } else if (!isVerified) {
-            uploadBtn.title = 'Complete the level verification test or enter owner code';
         } else {
-            uploadBtn.title = modal.ownerCodeVerified ? 'Upload level (Owner verified)' : 'Upload level';
+            uploadBtn.title = 'Upload level';
         }
 
         return { isValid, levelData };
@@ -6716,302 +6646,6 @@ class GeometryDash {
         }, 4000);
     }
 
-    // Level Verification System
-    startLevelVerification(modal) {
-        const validation = this.validateLevelData(modal);
-
-        if (!validation.isValid || !validation.levelData) {
-            this.showUploadError('Please fix validation errors before testing the level.');
-            return;
-        }
-
-        // Hide the upload modal temporarily
-        modal.style.display = 'none';
-
-        // Store the modal reference for later
-        this.tempUploadModal = modal;
-
-        // Create verification overlay
-        this.showVerificationOverlay();
-
-        // Start the verification game
-        this.startVerificationGame(validation.levelData);
-    }
-
-    showVerificationOverlay() {
-        const overlay = document.createElement('div');
-        overlay.id = 'verificationOverlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 1800;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        `;
-
-        overlay.innerHTML = `
-            <div style="text-align: center; margin-bottom: 30px;">
-                <h2 style="color: #ffc107; margin: 0 0 15px 0;">🎮 Level Verification Test</h2>
-                <p style="margin: 0 0 10px 0; font-size: 1.1rem;">Complete your level to verify it's beatable!</p>
-                <p style="margin: 0; color: #aaa;">The game will start in a moment...</p>
-                <div style="margin: 20px 0;">
-                    <button id="cancelVerificationBtn" style="
-                        background: #ff4444;
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-weight: bold;
-                    ">Cancel Test</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        // Add cancel functionality
-        const cancelBtn = overlay.querySelector('#cancelVerificationBtn');
-        cancelBtn.addEventListener('click', () => {
-            this.cancelVerification();
-        });
-    }
-
-    startVerificationGame(levelData) {
-        // Store original game state
-        this.originalGameState = {
-            gameRunning: this.gameRunning,
-            gamePaused: this.gamePaused,
-            currentLevel: this.currentLevel,
-            gameMode: this.gameMode,
-            inVerificationMode: false
-        };
-
-        // Set verification mode
-        this.inVerificationMode = true;
-        this.verificationLevelData = levelData;
-
-        // Initialize the verification game
-        setTimeout(() => {
-            this.hideVerificationOverlay();
-            this.initVerificationLevel(levelData);
-        }, 2000);
-    }
-
-    hideVerificationOverlay() {
-        const overlay = document.getElementById('verificationOverlay');
-        if (overlay) {
-            document.body.removeChild(overlay);
-        }
-    }
-
-    initVerificationLevel(levelData) {
-        // Stop any existing game
-        this.gameState = 'menu';
-
-        // Set up verification level
-        this.currentLevel = 'verification';
-        this.gameMode = 'mixed'; // Default to mixed mode
-
-        // Load the custom level data
-        this.loadCustomLevelForVerification(levelData);
-
-        // Start the verification game
-        this.startGame();
-
-        // Show verification UI
-        this.showVerificationUI();
-    }
-
-    loadCustomLevelForVerification(levelData) {
-        // Store the level data for verification
-        this.verificationLevel = levelData;
-        this.customLevelData = levelData;
-        this.isCustomLevel = true;
-
-        // Set up the level similar to how custom levels are loaded
-        if (levelData.gameMode) {
-            this.gameMode = levelData.gameMode;
-        }
-
-        // Load obstacles
-        this.obstacles = levelData.objects ? levelData.objects.map(obj => ({
-            x: obj.x,
-            y: obj.y,
-            width: obj.width,
-            height: obj.height,
-            type: obj.type,
-            rotation: obj.rotation || 0
-        })) : [];
-
-        // Load portals if they exist
-        this.portals = levelData.portals ? levelData.portals.map(portal => ({
-            x: portal.x,
-            y: portal.y,
-            width: portal.width,
-            height: portal.height,
-            fromMode: 'cube',
-            toMode: portal.mode,
-            rotation: portal.rotation || 0
-        })) : [];
-
-        // Initialize finish portal if it exists
-        this.finishPortal = levelData.finishPortal || null;
-    }
-
-    showVerificationUI() {
-        const ui = document.createElement('div');
-        ui.id = 'verificationUI';
-        ui.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 193, 7, 0.9);
-            color: #1a1a2e;
-            padding: 15px 25px;
-            border-radius: 8px;
-            z-index: 1500;
-            font-weight: bold;
-            text-align: center;
-            border: 2px solid #ffc107;
-        `;
-
-        ui.innerHTML = `
-            <div>🎮 VERIFICATION MODE</div>
-            <div style="font-size: 0.9rem; margin-top: 5px;">Complete the level to verify it's beatable!</div>
-            <button id="exitVerificationBtn" style="
-                background: #ff4444;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                margin-top: 10px;
-                cursor: pointer;
-                font-size: 0.9rem;
-            ">Exit Test</button>
-        `;
-
-        document.body.appendChild(ui);
-
-        // Add exit functionality
-        const exitBtn = ui.querySelector('#exitVerificationBtn');
-        exitBtn.addEventListener('click', () => {
-            this.cancelVerification();
-        });
-    }
-
-    handleVerificationCompletion() {
-        // Level completed successfully!
-        this.hideVerificationUI();
-
-        // Mark verification as successful
-        if (this.tempUploadModal) {
-            this.tempUploadModal.hasLevelVerification = true;
-            this.updateVerificationStatus(this.tempUploadModal, true);
-            this.tempUploadModal.style.display = 'flex';
-        }
-
-        // Restore original game state
-        this.exitVerificationMode();
-
-        // Show success message
-        this.showVerificationSuccess();
-    }
-
-    updateVerificationStatus(modal, isVerified) {
-        const statusText = modal.querySelector('#verificationStatusText');
-        const verificationSection = modal.querySelector('#levelVerificationSection');
-
-        if (isVerified) {
-            statusText.innerHTML = '✅ Level verified - Ready to upload!';
-            statusText.style.color = '#00ff88';
-            verificationSection.style.borderColor = '#00ff88';
-            verificationSection.style.background = 'rgba(0, 255, 136, 0.1)';
-        } else {
-            statusText.innerHTML = '❌ Level not verified';
-            statusText.style.color = '#ff6b6b';
-        }
-
-        // Re-validate to update upload button
-        this.validateLevelData(modal);
-    }
-
-    showVerificationSuccess() {
-        const success = document.createElement('div');
-        success.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, #00ff88, #00cc6a);
-            color: #1a1a2e;
-            padding: 30px;
-            border-radius: 15px;
-            z-index: 1900;
-            text-align: center;
-            font-weight: bold;
-            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
-        `;
-
-        success.innerHTML = `
-            <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
-            <h3 style="margin: 0 0 10px 0;">Level Verified!</h3>
-            <p style="margin: 0;">Your level is beatable and ready to upload!</p>
-        `;
-
-        document.body.appendChild(success);
-
-        setTimeout(() => {
-            if (document.body.contains(success)) {
-                document.body.removeChild(success);
-            }
-        }, 3000);
-    }
-
-    cancelVerification() {
-        this.hideVerificationOverlay();
-        this.hideVerificationUI();
-        this.exitVerificationMode();
-
-        // Show the upload modal again
-        if (this.tempUploadModal) {
-            this.tempUploadModal.style.display = 'flex';
-        }
-    }
-
-    hideVerificationUI() {
-        const ui = document.getElementById('verificationUI');
-        if (ui) {
-            document.body.removeChild(ui);
-        }
-    }
-
-    exitVerificationMode() {
-        this.inVerificationMode = false;
-        this.verificationLevelData = null;
-        this.verificationLevel = null;
-
-        // Restore original game state if it was stored
-        if (this.originalGameState) {
-            this.currentLevel = this.originalGameState.currentLevel;
-            this.gameMode = this.originalGameState.gameMode;
-
-            // Stop verification game
-            this.stopGame();
-
-            this.originalGameState = null;
-        }
-
-        this.tempUploadModal = null;
-    }
 
     updateLevelSelector() {
         // Disabled - custom levels only show in User Levels page

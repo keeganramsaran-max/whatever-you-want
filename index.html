@@ -3,112 +3,354 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Hub</title>
+    <title>Keegan's Game Portfolio</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            padding: 20px;
         }
 
         .container {
-            text-align: center;
             max-width: 1200px;
             width: 100%;
         }
 
-        h1 {
-            font-size: 3em;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease;
         }
 
-        .game-grid {
+        .profile-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 5px solid white;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            margin: 0 auto 20px;
+            display: block;
+            object-fit: cover;
+            animation: fadeIn 1.5s ease;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 15px;
+        }
+
+        .games-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
         }
 
         .game-card {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 30px;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: 2px solid rgba(255,255,255,0.2);
+            animation: fadeInUp 1s ease;
         }
 
         .game-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            background: rgba(255,255,255,0.15);
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
         }
 
-        .game-card h2 {
-            margin-top: 0;
-            color: #fff;
+        .game-card.masterpiece {
+            border: 3px solid gold;
+            position: relative;
+            animation: fadeInUp 1s ease, glow 2s ease-in-out infinite;
         }
 
-        .game-card p {
-            margin: 15px 0;
-            opacity: 0.9;
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
+            }
+            50% {
+                box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6), 0 0 30px rgba(255, 215, 0, 0.4);
+            }
         }
 
-        .play-btn {
-            background: linear-gradient(45deg, #ff4444, #ff6666);
+        .game-card.masterpiece::before {
+            content: "⭐ MASTERPIECE ⭐";
+            position: absolute;
+            top: 20px;
+            right: -35px;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #333;
+            padding: 8px 50px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transform: rotate(45deg);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+
+        .game-card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+        }
+
+        .game-card.masterpiece .game-card-header {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%);
+        }
+
+        .game-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+
+        .game-card-header h2 {
+            font-size: 2rem;
             color: white;
-            border: none;
+            margin-bottom: 8px;
+        }
+
+        .game-card.masterpiece .game-card-header h2 {
+            color: #333;
+            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.5);
+        }
+
+        .game-card-header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1rem;
+        }
+
+        .game-card.masterpiece .game-card-header p {
+            color: #555;
+        }
+
+        .game-card-body {
+            padding: 30px;
+        }
+
+        .game-description {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-size: 1.05rem;
+        }
+
+        .game-features {
+            margin-bottom: 25px;
+        }
+
+        .game-features h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .game-features ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .game-features li {
+            color: #666;
+            padding: 6px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .game-features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .play-button {
+            display: block;
+            width: 100%;
             padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
             border-radius: 10px;
             font-size: 1.2rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3);
+            font-weight: bold;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .play-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
+        .play-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .game-card.masterpiece .play-button {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #333;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .game-card.masterpiece .play-button:hover {
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            animation: fadeIn 2s ease;
+        }
+
+        .footer p {
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .github-badge {
+            display: inline-block;
+            margin-top: 15px;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .game-card.masterpiece::before {
+                font-size: 0.7rem;
+                padding: 5px 40px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎮 Game Hub</h1>
-        <p>Choose your adventure!</p>
-        <p style="margin-top: 10px;">
+        <div class="header">
+            <img src="Keegan.jpg" alt="Keegan" class="profile-image">
+            <h1>🎮 Keegan's Game Portfolio</h1>
+            <p>Welcome to my collection of awesome games!</p>
             <a href="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml" target="_blank" rel="noopener">
-                <img src="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml/badge.svg" alt="Build Status" style="vertical-align: middle;">
+                <img src="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml/badge.svg" alt="Build Status" style="vertical-align: middle; height: 20px;">
             </a>
-        </p>
+        </div>
 
-        <div class="game-grid">
-            <div class="game-card">
-                <h2>🔷 Geometry Dash</h2>
-                <p>Jump and fly your way through danger in this rhythm-based action platformer!</p>
-                <a href="geometry-dash.html" class="play-btn">Play Game</a>
+        <div class="games-grid">
+            <!-- Geometry Dash - The Masterpiece -->
+            <div class="game-card masterpiece">
+                <div class="game-card-header">
+                    <div class="game-icon">🔷</div>
+                    <h2>Geometry Dash</h2>
+                    <p>The Ultimate Platformer Experience</p>
+                </div>
+                <div class="game-card-body">
+                    <div class="game-description">
+                        Experience the most polished rhythm-based platformer with stunning visuals and challenging gameplay. Navigate through obstacles in multiple game modes!
+                    </div>
+                    <div class="game-features">
+                        <h3>Features:</h3>
+                        <ul>
+                            <li>5 unique game modes (Cube, Wave, Ship, Ball, Spider)</li>
+                            <li>Multiple difficulty levels</li>
+                            <li>Practice mode with checkpoints</li>
+                            <li>Level editor for custom creations</li>
+                            <li>Auto-play and speed control</li>
+                            <li>Leaderboard system</li>
+                            <li>Custom level uploads</li>
+                        </ul>
+                    </div>
+                    <a href="geometry-dash.html" class="play-button">🎮 Play Now</a>
+                </div>
             </div>
 
+            <!-- Arena Fighter -->
             <div class="game-card">
-                <h2>🛠️ Level Editor</h2>
-                <p>Create your own custom levels and share them with friends!</p>
-                <a href="level-editor.html" class="play-btn">Open Editor</a>
+                <div class="game-card-header">
+                    <div class="game-icon">⚔️</div>
+                    <h2>Arena Fighter</h2>
+                    <p>1v1 Co-op Fighting Game</p>
+                </div>
+                <div class="game-card-body">
+                    <div class="game-description">
+                        Engage in epic battles with your friend or challenge the computer AI. Master combos, blocks, and special moves in this action-packed fighter!
+                    </div>
+                    <div class="game-features">
+                        <h3>Features:</h3>
+                        <ul>
+                            <li>Local multiplayer (1v1)</li>
+                            <li>AI opponent with difficulty levels</li>
+                            <li>Multiple unique characters</li>
+                            <li>Special attacks and combos</li>
+                            <li>Dynamic animations</li>
+                            <li>Health and stamina systems</li>
+                            <li>Blocking and parrying mechanics</li>
+                        </ul>
+                    </div>
+                    <a href="1v1-coop-game.html" class="play-button">⚔️ Play Now</a>
+                </div>
             </div>
+        </div>
 
-            <div class="game-card">
-                <h2>⚔️ Arena Fighter</h2>
-                <p>Choose your fighter and battle in intense 1v1 combat! 4 unique characters with special abilities!</p>
-                <a href="1v1-coop-game.html" class="play-btn">Play Game</a>
-            </div>
+        <div class="footer">
+            <p>Built with ❤️ by Keegan</p>
+            <a href="https://github.com/keeganramsaran-max/whatever-you-want" target="_blank" rel="noopener" class="github-badge">
+                <img src="https://img.shields.io/badge/View%20on-GitHub-181717?style=for-the-badge&logo=github" alt="View on GitHub">
+            </a>
         </div>
     </div>
 </body>
