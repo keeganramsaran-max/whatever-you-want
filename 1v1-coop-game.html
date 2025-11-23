@@ -197,12 +197,15 @@
             left: 0;
             right: 0;
             padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: start;
+            gap: 20px;
         }
 
         .player-ui {
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
         }
 
         .player-ui.p1 {
@@ -273,18 +276,19 @@
         .wins-display {
             display: flex;
             justify-content: space-between;
-            padding: 0 20px;
+            padding: 0 50px;
             margin-top: 5px;
+            gap: 60px;
         }
 
         .win-circles {
             display: flex;
-            gap: 10px;
+            gap: 20px;
         }
 
         .win-circle {
-            width: 20px;
-            height: 20px;
+            width: 25px;
+            height: 25px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.3);
             border: 2px solid rgba(255, 255, 255, 0.5);
@@ -501,7 +505,7 @@
                 name: 'Berserker',
                 maxHealth: 150,
                 damageTaken: 1.5,
-                movementSpeed: 2.5,
+                movementSpeed: 3.125, // 2.5 * 1.25
                 attackSpeed: 50, // frames between attacks (~0.83 seconds at 60fps)
                 baseDamage: 10,
                 rageDamagePerHP: 0.2, // +1 damage per 5 HP lost
@@ -513,7 +517,7 @@
                 name: 'Defender',
                 maxHealth: 130,
                 damageTaken: 1.0,
-                movementSpeed: 2,
+                movementSpeed: 2.5, // 2 * 1.25
                 attackSpeed: 55, // slower heavy attacks
                 baseDamage: 15,
                 blockRegen: 0.3,
@@ -525,7 +529,7 @@
                 name: 'Assassin',
                 maxHealth: 75,
                 damageTaken: 1.0,
-                movementSpeed: 4,
+                movementSpeed: 5, // 4 * 1.25
                 attackSpeed: 45, // fastest attacks but still slower than before
                 baseDamage: 12,
                 critChance: 0.25,
@@ -538,7 +542,7 @@
                 name: 'Summoner',
                 maxHealth: 95,
                 damageTaken: 1.0,
-                movementSpeed: 2.5,
+                movementSpeed: 3.125, // 2.5 * 1.25
                 attackSpeed: 50,
                 baseDamage: 20,
                 color: '#44ffff',
@@ -1114,14 +1118,40 @@
                 this.x += this.velocityX;
                 this.y += this.velocityY;
 
-                // Ground collision
-                const groundY = canvas.height - 100 - this.height;
-                if (this.y >= groundY) {
-                    this.y = groundY;
-                    this.velocityY = 0;
-                    this.onGround = true;
-                } else {
-                    this.onGround = false;
+                // Platform collision detection
+                const platforms = [
+                    // Top horizontal platforms
+                    {x: 100, y: 130, w: 400, h: 30},
+                    {x: 700, y: 130, w: 400, h: 30},
+
+                    // Mid-level platforms
+                    {x: 200, y: 270, w: 350, h: 30},
+                    {x: 650, y: 270, w: 350, h: 30},
+
+                    // Lower platforms
+                    {x: 150, y: 400, w: 300, h: 30},
+                    {x: 750, y: 400, w: 300, h: 30},
+
+                    // Ground platform
+                    {x: 0, y: canvas.height - 100, w: canvas.width, h: 100}
+                ];
+
+                this.onGround = false;
+
+                // Check collision with all platforms
+                for (let platform of platforms) {
+                    // Check if player is on top of platform
+                    if (this.velocityY >= 0 && // falling down
+                        this.x + this.width > platform.x && // right edge past left edge of platform
+                        this.x < platform.x + platform.w && // left edge before right edge of platform
+                        this.y + this.height >= platform.y && // bottom edge at or below platform top
+                        this.y + this.height <= platform.y + platform.h) { // bottom edge not below platform bottom
+
+                        this.y = platform.y - this.height;
+                        this.velocityY = 0;
+                        this.onGround = true;
+                        break;
+                    }
                 }
 
                 // Wall collision
@@ -2875,23 +2905,62 @@
         }
 
         function drawGame() {
-            // Clear canvas
-            ctx.fillStyle = '#1a1a2e';
+            // Clear canvas - Brown background like platformer
+            ctx.fillStyle = '#8B6F47';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw ground
-            ctx.fillStyle = '#2a2a3e';
-            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-
-            // Draw grid
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 50) {
-                ctx.beginPath();
-                ctx.moveTo(i, 0);
-                ctx.lineTo(i, canvas.height);
-                ctx.stroke();
+            // Draw brick pattern background
+            ctx.fillStyle = '#6B5536';
+            const brickWidth = 40;
+            const brickHeight = 20;
+            for (let y = 0; y < canvas.height; y += brickHeight) {
+                for (let x = 0; x < canvas.width; x += brickWidth) {
+                    const offset = (Math.floor(y / brickHeight) % 2) * (brickWidth / 2);
+                    ctx.strokeStyle = '#4A3C28';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x + offset, y, brickWidth, brickHeight);
+                }
             }
+
+            // Draw golden/tan platform structures
+            const platforms = [
+                // Top horizontal platforms
+                {x: 100, y: 130, w: 400, h: 30},
+                {x: 700, y: 130, w: 400, h: 30},
+
+                // Mid-level platforms
+                {x: 200, y: 270, w: 350, h: 30},
+                {x: 650, y: 270, w: 350, h: 30},
+
+                // Lower platforms
+                {x: 150, y: 400, w: 300, h: 30},
+                {x: 750, y: 400, w: 300, h: 30},
+
+                // Ground platform
+                {x: 0, y: canvas.height - 100, w: canvas.width, h: 100}
+            ];
+
+            platforms.forEach(platform => {
+                // Golden brick color
+                ctx.fillStyle = '#D4AF37';
+                ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
+
+                // Draw brick texture on platforms
+                ctx.strokeStyle = '#B8860B';
+                ctx.lineWidth = 2;
+                const platformBrickW = 30;
+                const platformBrickH = 15;
+                for (let py = platform.y; py < platform.y + platform.h; py += platformBrickH) {
+                    for (let px = platform.x; px < platform.x + platform.w; px += platformBrickW) {
+                        const brickOffset = (Math.floor((py - platform.y) / platformBrickH) % 2) * (platformBrickW / 2);
+                        ctx.strokeRect(px + brickOffset, py, platformBrickW, platformBrickH);
+                    }
+                }
+
+                // Highlight edge
+                ctx.fillStyle = '#F4E5A1';
+                ctx.fillRect(platform.x, platform.y, platform.w, 3);
+            });
 
             // Draw effects
             effects.forEach(effect => {
