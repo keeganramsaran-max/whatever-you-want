@@ -966,6 +966,79 @@ class LevelEditor {
         this.closeModal();
     }
 
+    compressLevel(levelData) {
+        // Convert to compact JSON (no spaces)
+        const jsonStr = JSON.stringify(levelData);
+
+        // Simple compression: use shorter keys and remove unnecessary data
+        const compressed = {
+            v: 2, // Version 2 = compressed format
+            n: levelData.name,
+            d: levelData.difficulty,
+            o: levelData.objects.map(obj => [
+                Math.round(obj.x), Math.round(obj.y),
+                Math.round(obj.width), Math.round(obj.height),
+                obj.type, obj.rotation || 0, obj.gameMode || ''
+            ]),
+            p: levelData.portals.map(p => [
+                Math.round(p.x), Math.round(p.y),
+                Math.round(p.width), Math.round(p.height),
+                p.mode, p.rotation || 0
+            ]),
+            sp: levelData.speedPortals.map(p => [
+                Math.round(p.x), Math.round(p.y),
+                Math.round(p.width), Math.round(p.height),
+                p.speed, p.rotation || 0
+            ]),
+            fp: levelData.finishPortals.map(p => [
+                Math.round(p.x), Math.round(p.y),
+                Math.round(p.width), Math.round(p.height),
+                p.rotation || 0
+            ])
+        };
+
+        // Encode to base64 for further size reduction
+        return btoa(JSON.stringify(compressed));
+    }
+
+    decompressLevel(compressedData) {
+        try {
+            // Try to decode from base64
+            const jsonStr = atob(compressedData);
+            const data = JSON.parse(jsonStr);
+
+            // Check if it's compressed format
+            if (data.v === 2) {
+                return {
+                    name: data.n,
+                    difficulty: data.d,
+                    objects: data.o.map(o => ({
+                        x: o[0], y: o[1], width: o[2], height: o[3],
+                        type: o[4], rotation: o[5], gameMode: o[6]
+                    })),
+                    portals: data.p.map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        mode: p[4], rotation: p[5]
+                    })),
+                    speedPortals: data.sp.map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        speed: p[4], rotation: p[5]
+                    })),
+                    finishPortals: data.fp.map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        rotation: p[4]
+                    }))
+                };
+            }
+
+            // If not compressed, return as-is
+            return data;
+        } catch (e) {
+            // If base64 decode fails, try parsing as regular JSON
+            return JSON.parse(compressedData);
+        }
+    }
+
     exportLevel() {
         const levelData = {
             name: document.getElementById('levelName').value,
@@ -977,11 +1050,12 @@ class LevelEditor {
             created: new Date().toISOString()
         };
 
-        return JSON.stringify(levelData, null, 2);
+        // Return compressed format
+        return this.compressLevel(levelData);
     }
 
     importLevel(data) {
-        const levelData = JSON.parse(data);
+        const levelData = this.decompressLevel(data);
 
         this.objects = levelData.objects || [];
         this.portals = levelData.portals || [];
