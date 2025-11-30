@@ -57,6 +57,25 @@
             margin-bottom: 15px;
         }
 
+        .about-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 12px 30px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .about-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
         .games-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -288,6 +307,8 @@
             <a href="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml" target="_blank" rel="noopener">
                 <img src="https://github.com/keeganramsaran-max/whatever-you-want/actions/workflows/ci.yml/badge.svg" alt="Build Status" style="vertical-align: middle; height: 20px;">
             </a>
+            <br>
+            <a href="about.html" class="about-link">👤 About Me</a>
         </div>
 
         <div class="games-grid">
