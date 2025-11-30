@@ -879,7 +879,8 @@ class LevelEditor {
             'cube': '#00ff88',
             'wave': '#2196F3',
             'ship': '#FF9800',
-            'ball': '#9C27B0'
+            'ball': '#9C27B0',
+            'spider': '#00ffff'
         };
         return colors[mode] || '#ffffff';
     }

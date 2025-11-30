@@ -3467,7 +3467,8 @@ class GeometryDash {
                 cube: '#00ff88',
                 wave: '#ff4444',
                 ship: '#ffff00',
-                ball: '#ff00ff'
+                ball: '#ff00ff',
+                spider: '#00ffff'
             };
 
             // Handle rotation if present
