@@ -959,7 +959,8 @@ class LevelEditor {
                 this.importLevel(data);
                 alert('Level loaded successfully!');
             } catch (e) {
-                alert('Invalid level data!');
+                console.error('Error loading level:', e);
+                alert('Invalid level data! Error: ' + e.message);
             }
         }
 
@@ -1003,6 +1004,9 @@ class LevelEditor {
 
     decompressLevel(compressedData) {
         try {
+            // Trim whitespace
+            compressedData = compressedData.trim();
+
             // Try to decode from base64
             const jsonStr = atob(compressedData);
             const data = JSON.parse(jsonStr);
@@ -1010,23 +1014,23 @@ class LevelEditor {
             // Check if it's compressed format
             if (data.v === 2) {
                 return {
-                    name: data.n,
-                    difficulty: data.d,
-                    objects: data.o.map(o => ({
+                    name: data.n || 'Custom Level',
+                    difficulty: data.d || 1,
+                    objects: (data.o || []).map(o => ({
                         x: o[0], y: o[1], width: o[2], height: o[3],
-                        type: o[4], rotation: o[5], gameMode: o[6]
+                        type: o[4], rotation: o[5] || 0, gameMode: o[6] || ''
                     })),
-                    portals: data.p.map(p => ({
+                    portals: (data.p || []).map(p => ({
                         x: p[0], y: p[1], width: p[2], height: p[3],
-                        mode: p[4], rotation: p[5]
+                        mode: p[4], rotation: p[5] || 0
                     })),
-                    speedPortals: data.sp.map(p => ({
+                    speedPortals: (data.sp || []).map(p => ({
                         x: p[0], y: p[1], width: p[2], height: p[3],
-                        speed: p[4], rotation: p[5]
+                        speed: p[4], rotation: p[5] || 0
                     })),
-                    finishPortals: data.fp.map(p => ({
+                    finishPortals: (data.fp || []).map(p => ({
                         x: p[0], y: p[1], width: p[2], height: p[3],
-                        rotation: p[4]
+                        rotation: p[4] || 0
                     }))
                 };
             }
@@ -1034,6 +1038,7 @@ class LevelEditor {
             // If not compressed, return as-is
             return data;
         } catch (e) {
+            console.error('Base64 decode failed, trying regular JSON:', e);
             // If base64 decode fails, try parsing as regular JSON
             return JSON.parse(compressedData);
         }

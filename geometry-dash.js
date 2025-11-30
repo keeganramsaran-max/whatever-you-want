@@ -483,23 +483,36 @@ class GeometryDash {
                     this.restartGame();
                 }
             } else if (e.target.value === 'impossible') {
+                console.log('Impossible level selected, showing notification...');
                 this.showLevelNotification(
                     "Warning: Impossible Level Selected",
                     "The developer's way to vent pent up rage",
                     () => {
+                        console.log('Impossible level confirmed, loading...');
                         this.currentLevel = 'impossible';
                         this.loadImpossibleChallenge();
                         document.getElementById('currentLevel').textContent = "Impossible";
-                        if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
-                            this.restartGame();
-                        }
+                        // Always restart to ensure level loads properly
+                        this.restartGame();
                     },
                     () => {
+                        console.log('Impossible level cancelled');
                         // Reset to previous level if cancelled
                         document.getElementById('levelSelect').value = '1';
                         this.currentLevel = 1;
                         this.isCustomLevel = false;
                         this.customLevelData = null;
+
+                        // Clear custom level from localStorage
+                        localStorage.removeItem('customLevel');
+
+                        // Remove ?custom=true from URL if present
+                        const url = new URL(window.location);
+                        if (url.searchParams.has('custom')) {
+                            url.searchParams.delete('custom');
+                            window.history.replaceState({}, '', url);
+                        }
+
                         this.generateLevel();
                         document.getElementById('currentLevel').textContent = "1";
                         if (this.gameState === 'playing' || this.gameState === 'levelComplete') {
@@ -515,6 +528,17 @@ class GeometryDash {
                 // Regular level selected - clear custom level flags
                 this.isCustomLevel = false;
                 this.customLevelData = null;
+
+                // Clear custom level from localStorage
+                localStorage.removeItem('customLevel');
+
+                // Remove ?custom=true from URL if present
+                const url = new URL(window.location);
+                if (url.searchParams.has('custom')) {
+                    url.searchParams.delete('custom');
+                    window.history.replaceState({}, '', url);
+                }
+
                 this.currentLevel = parseInt(e.target.value);
                 this.generateLevel();
                 document.getElementById('currentLevel').textContent = this.currentLevel;
@@ -780,11 +804,11 @@ class GeometryDash {
             const customLevel = localStorage.getItem('customLevel');
             if (customLevel) {
                 try {
-                    this.customLevelData = JSON.parse(customLevel);
+                    this.customLevelData = this.decompressLevel(customLevel);
                     this.isCustomLevel = true;
                     this.updateBackToEditorButton();
                 } catch (e) {
-                    console.error('Invalid custom level data');
+                    console.error('Invalid custom level data:', e);
                     this.isCustomLevel = false;
                     this.updateBackToEditorButton();
                 }
@@ -908,6 +932,48 @@ class GeometryDash {
         }
 
         console.log('Assigned game modes to obstacles based on portal positions');
+    }
+
+    decompressLevel(compressedData) {
+        try {
+            // Trim whitespace
+            compressedData = compressedData.trim();
+
+            // Try to decode from base64
+            const jsonStr = atob(compressedData);
+            const data = JSON.parse(jsonStr);
+
+            // Check if it's compressed format (version 2)
+            if (data.v === 2) {
+                return {
+                    name: data.n || 'Custom Level',
+                    difficulty: data.d || 1,
+                    objects: (data.o || []).map(o => ({
+                        x: o[0], y: o[1], width: o[2], height: o[3],
+                        type: o[4], rotation: o[5] || 0, gameMode: o[6] || ''
+                    })),
+                    portals: (data.p || []).map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        mode: p[4], rotation: p[5] || 0
+                    })),
+                    speedPortals: (data.sp || []).map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        speed: p[4], rotation: p[5] || 0
+                    })),
+                    finishPortals: (data.fp || []).map(p => ({
+                        x: p[0], y: p[1], width: p[2], height: p[3],
+                        rotation: p[4] || 0
+                    }))
+                };
+            }
+
+            // If not compressed, return as-is (backward compatibility)
+            return data;
+        } catch (e) {
+            console.error('Base64 decode failed, trying regular JSON:', e);
+            // If base64 decode fails, try parsing as regular JSON (old format)
+            return JSON.parse(compressedData);
+        }
     }
 
     loadDeveloperChallenge() {
