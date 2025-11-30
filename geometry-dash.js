@@ -6560,8 +6560,9 @@ class GeometryDash {
         // Check for required properties
         if (!data || typeof data !== 'object') return false;
 
-        // Level should have sections, obstacles, objects, or template
-        if (!data.sections && !data.obstacles && !data.objects && !data.template) return false;
+        // Level should have sections, obstacles, objects, portals, or template
+        // Level editor format uses: objects, portals, speedPortals, finishPortals
+        if (!data.sections && !data.obstacles && !data.objects && !data.portals && !data.template) return false;
 
         // If it has sections, validate structure
         if (data.sections && Array.isArray(data.sections)) {
