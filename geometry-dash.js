@@ -6515,7 +6515,15 @@ class GeometryDash {
         // Validate JSON data
         try {
             if (jsonInput.value.trim()) {
-                levelData = JSON.parse(jsonInput.value);
+                const inputData = jsonInput.value.trim();
+
+                // Try to parse as compressed data first (base64 from level editor)
+                try {
+                    levelData = this.decompressLevel(inputData);
+                } catch (decompressError) {
+                    // If decompression fails, try parsing as regular JSON
+                    levelData = JSON.parse(inputData);
+                }
 
                 // Basic level data validation
                 if (!this.isValidLevelData(levelData)) {
@@ -6528,7 +6536,7 @@ class GeometryDash {
             }
         } catch (e) {
             isValid = false;
-            validationErrors.push('Invalid JSON format');
+            validationErrors.push('Invalid JSON format: ' + e.message);
         }
 
         // Debug logging
